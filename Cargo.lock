@@ -5,6 +5,6 @@ name = "mat_engine"
 version = "0.1.0"
 
 [[package]]
-name = "sample1"
+name = "sample_sandbox"
 version = "0.1.0"
 
