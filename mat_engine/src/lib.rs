@@ -1,21 +1,30 @@
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+use std::{cell::RefCell, rc::Rc};
 
-//TODO: Refactor
+pub mod application;
+pub mod windowing;
 
-///Temporary main function
-pub fn temporary_main() {
+/// Execute a given Application. Doesn't return, use the `Application::close()` method to
+/// handle shutdown.
+pub fn run(mut app: Box<dyn application::Application>) -> ! {
     log::trace!("Starting mat_engine");
 
-    let winit_event_loop = winit::event_loop::EventLoop::new();
+    let winit_event_loop = winit::event_loop::EventLoop::<windowing::Request>::with_user_event();
+    let winit_event_loop_proxy = winit_event_loop.create_proxy();
     let winit_window = winit::window::WindowBuilder::new()
         .build(&winit_event_loop)
         .expect("Could not obtain winit window");
+
+    let windowing_system = Rc::new(RefCell::new(windowing::WindowingSystem {
+        winit_window,
+        winit_event_loop_proxy,
+        force_quit: false,
+    }));
+
+    let initialized_systems = application::InitializedSystems {
+        windowing_system: windowing_system.clone(),
+    };
+
+    app.init(initialized_systems);
 
     winit_event_loop.run(move |event, _, control_flow| {
         // Immediately start the next loop once current is done, instead of waiting
@@ -23,47 +32,53 @@ pub fn temporary_main() {
         // TODO: This may be useful for frame-rate limiting, I'm unsure. Need to examine.
         *control_flow = winit::event_loop::ControlFlow::Poll;
 
-        match event {
-            winit::event::Event::NewEvents(start_cause) => {
-                //log::trace!("winit loop -> NewEvents(start_cause = {:?})", start_cause);
-            }
-            winit::event::Event::WindowEvent { window_id, event } => {
-                match event {
-                    winit::event::WindowEvent::CloseRequested => {
-                        //log::trace!("winit window CloseRequested event, closing.");
-                        *control_flow = winit::event_loop::ControlFlow::Exit;
+        // If the application is to be closed, we may skip everything below, and just quit.
+        if let winit::event::Event::LoopDestroyed = event {
+            app.close();
+            log::trace!("Ending mat_engine");
+        // Even when we set *control_flow to Exit, winit still wants to go through the
+        // outstanding events. If we wish to skip this, we can use force_quit to ignore
+        // all the events until the quitting actually occurs.
+        } else if windowing_system.borrow_mut().force_quit {
+            log::trace!("Force quitting... ignoring outsanding event");
+            *control_flow = winit::event_loop::ControlFlow::Exit;
+        } else {
+            match event {
+                winit::event::Event::UserEvent(request) => {
+                    match request {
+                        windowing::Request::Quit => {
+                            // goes to winit::event::Event::LoopDestroyed, after processing
+                            // queued/outstanding events
+                            *control_flow = winit::event_loop::ControlFlow::Exit;
+                        }
+                    };
+                }
+                winit::event::Event::WindowEvent {
+                    event: winit::event::WindowEvent::CloseRequested,
+                    ..
+                } => {
+                    // goes to winit::event::Event::LoopDestroyed, after processing
+                    // queued/outstanding events
+                    *control_flow = winit::event_loop::ControlFlow::Exit;
+                }
+                winit::event::Event::MainEventsCleared => {
+                    app.update();
+                    {
+                        windowing_system.borrow_mut().winit_window.request_redraw();
                     }
-                    other_event => {
-                        log::trace!("winit window event, specifically {:?}", other_event);
-                    }
-                };
-            }
-            winit::event::Event::DeviceEvent { device_id, event } => {}
-            winit::event::Event::UserEvent(_) => {
-                log::error!("winit UserEvent is not (currently?) supported.");
-                unimplemented!();
-            }
-            winit::event::Event::Suspended => {
-                log::trace!("winit loop -> application suspended");
-            }
-            winit::event::Event::Resumed => {
-                log::trace!("winit loop -> application resumed");
-            }
-            winit::event::Event::MainEventsCleared => {
-                //log::trace!("TODO update goes here...");
-
-                // Once we finish updating, we want to redraw.
-                // TODO: Do we??? Also: Framerate limiting.
-                winit_window.request_redraw();
-            }
-            winit::event::Event::RedrawRequested(_) => {
-                //log::trace!("TODO render goes here");
-            }
-            winit::event::Event::RedrawEventsCleared => {
-                //log::trace!("TODO post render goes here");
-            }
-            winit::event::Event::LoopDestroyed => {
-                //log::trace!("winit event loop quitting");
+                }
+                winit::event::Event::RedrawRequested(_) => {
+                    app.render();
+                }
+                winit::event::Event::LoopDestroyed => {
+                    unreachable!("Should be handled by if let");
+                }
+                // Ignore any event not specified above.
+                // See winit docs for list of all possible events, and their meanings.
+                // https://docs.rs/winit/0.22.1/winit/event/enum.Event.html
+                _other => {
+                    //log::trace!("Winit misc. event: {:?}", other);
+                }
             }
         }
     })
