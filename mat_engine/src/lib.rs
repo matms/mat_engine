@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 pub mod application;
+pub mod render;
 pub mod windowing;
 
 /// Execute a given Application. Doesn't return, use the `Application::close()` method to
@@ -18,10 +19,15 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
         winit_window,
         winit_event_loop_proxy,
         force_quit: false,
+        resize_listeners: vec![],
     }));
+
+    let rendering_system =
+        crate::render::RenderingSystem::new(&mut windowing_system.as_ref().borrow_mut());
 
     let initialized_systems = application::InitializedSystems {
         windowing_system: windowing_system.clone(),
+        rendering_system: rendering_system.clone(),
     };
 
     app.init(initialized_systems);
@@ -61,6 +67,27 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                     // queued/outstanding events
                     *control_flow = winit::event_loop::ControlFlow::Exit;
                 }
+                // --------------------------------------------------
+                // +----------+
+                // | RESIZING |
+                // +----------+
+                winit::event::Event::WindowEvent {
+                    event: winit::event::WindowEvent::Resized(new_size),
+                    ..
+                } => {
+                    windowing_system
+                        .borrow()
+                        .notify_resize(new_size.width, new_size.height);
+                }
+                winit::event::Event::WindowEvent {
+                    event: winit::event::WindowEvent::ScaleFactorChanged { new_inner_size, .. },
+                    ..
+                } => {
+                    windowing_system
+                        .borrow()
+                        .notify_resize(new_inner_size.width, new_inner_size.height);
+                }
+                // --------------------------------------------------
                 winit::event::Event::MainEventsCleared => {
                     app.update();
                     {

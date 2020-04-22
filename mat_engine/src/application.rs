@@ -42,4 +42,5 @@ pub trait Application {
 /// only access the inner contents when needed (and NOT permanently borrow it).
 pub struct InitializedSystems {
     pub windowing_system: Rc<RefCell<crate::windowing::WindowingSystem>>,
+    pub rendering_system: Rc<RefCell<crate::render::RenderingSystem>>,
 }

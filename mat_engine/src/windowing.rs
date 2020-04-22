@@ -1,7 +1,21 @@
+use std::{cell::RefCell, rc::Rc};
+
+// TODO: Refactor into better, more general event system
+
+/// Used to allow systems to be notified whenever the window is resized
+pub(crate) trait ResizeListener {
+    /// Implement to be notified whenever the window is resized.
+    /// Note that we inform the new INNER size of the window. See winit's docs for more
+    /// info on the INNER x OUTER size dichotomy.
+    fn resize_event(&mut self, new_inner_width: u32, new_inner_height: u32);
+}
+
 pub struct WindowingSystem {
     pub(crate) winit_window: winit::window::Window,
     pub(crate) winit_event_loop_proxy: winit::event_loop::EventLoopProxy<Request>,
     pub(crate) force_quit: bool,
+    // TODO: Refactor into better event system
+    pub(crate) resize_listeners: Vec<Rc<RefCell<dyn ResizeListener>>>,
 }
 
 impl WindowingSystem {
@@ -15,10 +29,28 @@ impl WindowingSystem {
     }
 
     /// Forces winit's event loop to quit, ignoring all outstanding winit events.
-    /// Application::close()  will be automatically called, there is no need for
+    /// Application::close() will be automatically called, there is no need for
     /// you to call it.
     pub fn force_quit(&mut self) {
         self.force_quit = true;
+    }
+
+    pub(crate) fn get_window_ref(&self) -> &winit::window::Window {
+        &self.winit_window
+    }
+
+    /// Adds a resize listener (see trait ``ResizeListener`) that will be notified whenever
+    /// a resize event occurs.
+    pub(crate) fn add_resize_listener(&mut self, resize_listener: Rc<RefCell<dyn ResizeListener>>) {
+        self.resize_listeners.push(resize_listener);
+    }
+
+    /// Notifies all resize listeners (registered with `add_resize_listener()`, of a resize)
+    pub(crate) fn notify_resize(&self, new_inner_width: u32, new_inner_height: u32) {
+        for x in &self.resize_listeners {
+            x.borrow_mut()
+                .resize_event(new_inner_width, new_inner_height);
+        }
     }
 }
 

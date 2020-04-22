@@ -9,3 +9,10 @@ edition = "2018"
 [dependencies]
 log = "0.4.8"
 winit = "0.22.1"
+image = "0.23.4"
+futures = "0.3.4"
+
+# TODO: Configure for other OS's.
+[dependencies.wgpu]
+version = "0.5.0"
+features = ["vulkan"]
