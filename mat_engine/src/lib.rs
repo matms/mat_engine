@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 pub mod application;
+pub mod imgui;
 pub mod render;
 pub mod windowing;
 
@@ -49,7 +50,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
             log::trace!("Force quitting... ignoring outsanding event");
             *control_flow = winit::event_loop::ControlFlow::Exit;
         } else {
-            match event {
+            match &event {
                 winit::event::Event::UserEvent(request) => {
                     match request {
                         windowing::Request::Quit => {
@@ -107,6 +108,8 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                     //log::trace!("Winit misc. event: {:?}", other);
                 }
             }
+
+            app.event_postprocessor(&event);
         }
     })
 }

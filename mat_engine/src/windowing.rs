@@ -56,6 +56,6 @@ impl WindowingSystem {
 
 /// Represents a request to the windowing system in the form of an UserEvent.
 #[derive(Debug)]
-pub(crate) enum Request {
+pub enum Request {
     Quit,
 }

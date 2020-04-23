@@ -10,3 +10,6 @@ edition = "2018"
 mat_engine = {path = "../mat_engine"}
 log = "0.4.8"
 flexi_logger = "0.15.2"
+imgui = "0.3.0"
+# Temporary
+winit = "0.22.1"

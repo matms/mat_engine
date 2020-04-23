@@ -3,7 +3,8 @@
 use std::{cell::RefCell, rc::Rc};
 
 pub struct RenderingSystem {
-    state: WgpuState,
+    pub(crate) state: WgpuState,
+    pub(crate) frt: Option<FrameRenderTarget>,
 }
 
 impl RenderingSystem {
@@ -20,13 +21,49 @@ impl RenderingSystem {
                 windowing_system.get_window_ref().inner_size().width,
                 windowing_system.get_window_ref().inner_size().height,
             ),
+            frt: None,
         }));
         windowing_system.add_resize_listener(out.clone());
         out
     }
 
-    pub fn render(&mut self) {
-        self.state.render();
+    pub fn start_render(&mut self) {
+        self.frt = Some(self.state.start_render());
+    }
+
+    pub fn complete_render(&mut self) {
+        self.state.complete_render(
+            std::mem::replace(&mut self.frt, None)
+                .expect("No frame render target: You must've forgotten to call start_render()"),
+        );
+    }
+
+    #[cfg(not(feature = "glsl-to-spirv"))]
+    pub(crate) fn make_imgui_wgpu_renderer(
+        &mut self,
+        imgui_ctx: &mut ::imgui::Context,
+    ) -> imgui_wgpu::Renderer {
+        imgui_wgpu::Renderer::new(
+            imgui_ctx,
+            &self.state.device,
+            &mut self.state.queue,
+            self.state.swap_chain_descriptor.format,
+            None,
+        )
+    }
+
+    #[cfg(feature = "glsl-to-spirv")]
+    pub(crate) fn make_imgui_wgpu_renderer(
+        &mut self,
+        imgui_ctx: &mut ::imgui::Context,
+    ) -> imgui_wgpu::Renderer {
+        imgui_wgpu::Renderer::new_glsl(
+            imgui_ctx,
+            &self.state.device,
+            &mut self.state.queue,
+            self.state.swap_chain_descriptor.format,
+            None,
+        )
     }
 }
 
@@ -37,10 +74,10 @@ impl crate::windowing::ResizeListener for RenderingSystem {
 }
 
 /// Do not use directly from user code. It is managed by `RenderingSystem`.
-struct WgpuState {
+pub(crate) struct WgpuState {
     surface: wgpu::Surface,
     adapter: wgpu::Adapter,
-    device: wgpu::Device,
+    pub(crate) device: wgpu::Device,
     queue: wgpu::Queue,
     swap_chain_descriptor: wgpu::SwapChainDescriptor,
     swap_chain: wgpu::SwapChain,
@@ -97,6 +134,7 @@ impl WgpuState {
             // falling back to Fifo, as the docs describe.
             // Mailbox seems to induce some frames having longer frametimes than other,
             // I should investigate.
+            // Fifo just means wait for Vsync.
             present_mode: wgpu::PresentMode::Fifo,
         };
 
@@ -125,7 +163,7 @@ impl WgpuState {
             .create_swap_chain(&self.surface, &self.swap_chain_descriptor);
     }
 
-    fn render(&mut self) {
+    fn start_render(&mut self) -> FrameRenderTarget {
         let frame = self.swap_chain.get_next_texture().unwrap();
 
         let command_encoder_descriptor = &wgpu::CommandEncoderDescriptor {
@@ -136,10 +174,22 @@ impl WgpuState {
             .device
             .create_command_encoder(command_encoder_descriptor);
 
+        let mut frt = FrameRenderTarget { frame, encoder };
+
+        self.clear_screen(&mut frt);
+
+        frt
+    }
+
+    fn complete_render(&mut self, frt: FrameRenderTarget) {
+        self.queue.submit(&[frt.encoder.finish()])
+    }
+
+    fn clear_screen(&mut self, frt: &mut FrameRenderTarget) {
         {
             let render_pass_descriptor = &wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
+                    attachment: &frt.frame.view,
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Clear,
                     store_op: wgpu::StoreOp::Store,
@@ -152,9 +202,12 @@ impl WgpuState {
                 }],
                 depth_stencil_attachment: None,
             };
-            let _render_pass = encoder.begin_render_pass(render_pass_descriptor);
+            let _render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
         }
-
-        self.queue.submit(&[encoder.finish()]);
     }
+}
+
+pub struct FrameRenderTarget {
+    pub(crate) frame: wgpu::SwapChainOutput,
+    pub(crate) encoder: wgpu::CommandEncoder,
 }

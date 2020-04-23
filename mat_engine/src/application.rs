@@ -35,6 +35,9 @@ pub trait Application {
 
     /// Called once per frame, after `Application::update()`
     fn render(&mut self) {}
+
+    /// TEMPORARY -> TODO REFACTOR:
+    fn event_postprocessor(&mut self, event: &winit::event::Event<crate::windowing::Request>) {}
 }
 
 /// Pointers to systems that are already intialized. To be used by user according to their
