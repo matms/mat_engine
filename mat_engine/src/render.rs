@@ -1,8 +1,10 @@
 // See https://sotrh.github.io/learn-wgpu/
 
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Weak};
 
+#[allow(dead_code, unused_variables)]
 pub struct RenderingSystem {
+    pub(crate) systems: Weak<RefCell<crate::systems::Systems>>,
     pub(crate) state: WgpuState,
     pub(crate) frt: Option<FrameRenderTarget>,
 }
@@ -12,19 +14,23 @@ impl RenderingSystem {
     ///
     /// Needs mutable borrow of the windowing system because it adds itself as a listener
     /// to certain window events (specifically, for now, it listens to resizes).
-    pub(crate) fn new(
-        windowing_system: &mut crate::windowing::WindowingSystem,
-    ) -> Rc<RefCell<Self>> {
-        let out = Rc::new(RefCell::new(Self {
+    pub(crate) fn new(systems: Weak<RefCell<crate::systems::Systems>>) -> Self {
+        let sys_rc = systems
+            .upgrade()
+            .expect("Failed to get systems, maybe the Engine has been dropped");
+        let systems_ref = sys_rc.borrow();
+        let windowing_system = systems_ref
+            .windowing()
+            .expect("Failed to Borrow the Windowing System. Note that you must create the Windowing System BEFORE the Rendering System");
+        Self {
+            systems,
             state: WgpuState::new(
                 windowing_system.get_window_ref(),
                 windowing_system.get_window_ref().inner_size().width,
                 windowing_system.get_window_ref().inner_size().height,
             ),
             frt: None,
-        }));
-        windowing_system.add_resize_listener(out.clone());
-        out
+        }
     }
 
     pub fn start_render(&mut self) {
@@ -65,6 +71,10 @@ impl RenderingSystem {
             None,
         )
     }
+
+    pub(crate) fn state_and_frt(&mut self) -> (&mut WgpuState, &mut Option<FrameRenderTarget>) {
+        return (&mut self.state, &mut self.frt);
+    }
 }
 
 impl crate::windowing::ResizeListener for RenderingSystem {
@@ -74,6 +84,7 @@ impl crate::windowing::ResizeListener for RenderingSystem {
 }
 
 /// Do not use directly from user code. It is managed by `RenderingSystem`.
+#[allow(dead_code, unused_variables)]
 pub(crate) struct WgpuState {
     surface: wgpu::Surface,
     adapter: wgpu::Adapter,
@@ -170,7 +181,7 @@ impl WgpuState {
             label: Some("wgpu renderer encoder"),
         };
 
-        let mut encoder = self
+        let encoder = self
             .device
             .create_command_encoder(command_encoder_descriptor);
 

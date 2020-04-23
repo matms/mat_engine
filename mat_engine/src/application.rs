@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 /// Application Interface
 ///
 /// Unfortunately, winit wants to take control of the main loop. Therefore, we have to manage
@@ -16,34 +14,32 @@ use std::{cell::RefCell, rc::Rc};
 /// handle_event.
 pub trait Application {
     /// Called once, at initialization.
-    /// The Engine leaves most initialization to the user. Unfortunately,
-    /// the windowing system needs to be preinitialized, due to the way winit works.
-    /// Therefore, pass initialized_systems to the user, and they may use it as they wish.
     #[allow(unused_variables)]
-    fn init(&mut self, initialized_systems: InitializedSystems) {
+    fn init(&mut self, engine: &mut crate::systems::Engine) {
         log::trace!("Application initialized. User should probably override Application::init()");
     }
 
     /// Called once the engine wants to close. For e.g. you may save information here.
     /// DO NOT CALL DIRECTLY FROM USER CODE, IT WILL NOT CLOSE THE APP.
-    fn close(&mut self) {
+    #[allow(unused_variables)]
+    fn close(&mut self, engine: &mut crate::systems::Engine) {
         log::trace!("Application closed");
     }
 
     /// Called once per frame, after handling events but before rendering
-    fn update(&mut self) {}
+    #[allow(unused_variables)]
+    fn update(&mut self, engine: &mut crate::systems::Engine) {}
 
     /// Called once per frame, after `Application::update()`
-    fn render(&mut self) {}
+    #[allow(unused_variables)]
+    fn render(&mut self, engine: &mut crate::systems::Engine) {}
 
     /// TEMPORARY -> TODO REFACTOR:
-    fn event_postprocessor(&mut self, event: &winit::event::Event<crate::windowing::Request>) {}
-}
-
-/// Pointers to systems that are already intialized. To be used by user according to their
-/// preferences and goals. Note that if a system is passed by RefCell<>, the user should
-/// only access the inner contents when needed (and NOT permanently borrow it).
-pub struct InitializedSystems {
-    pub windowing_system: Rc<RefCell<crate::windowing::WindowingSystem>>,
-    pub rendering_system: Rc<RefCell<crate::render::RenderingSystem>>,
+    #[allow(unused_variables)]
+    fn event_postprocessor(
+        &mut self,
+        engine: &mut crate::systems::Engine,
+        event: &winit::event::Event<crate::windowing::Request>,
+    ) {
+    }
 }

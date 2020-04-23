@@ -1,4 +1,5 @@
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
+use std::rc::Weak;
 
 // TODO: Refactor into better, more general event system
 
@@ -11,11 +12,10 @@ pub(crate) trait ResizeListener {
 }
 
 pub struct WindowingSystem {
+    pub(crate) systems: Weak<RefCell<crate::systems::Systems>>,
     pub(crate) winit_window: winit::window::Window,
     pub(crate) winit_event_loop_proxy: winit::event_loop::EventLoopProxy<Request>,
     pub(crate) force_quit: bool,
-    // TODO: Refactor into better event system
-    pub(crate) resize_listeners: Vec<Rc<RefCell<dyn ResizeListener>>>,
 }
 
 impl WindowingSystem {
@@ -39,17 +39,19 @@ impl WindowingSystem {
         &self.winit_window
     }
 
-    /// Adds a resize listener (see trait ``ResizeListener`) that will be notified whenever
-    /// a resize event occurs.
-    pub(crate) fn add_resize_listener(&mut self, resize_listener: Rc<RefCell<dyn ResizeListener>>) {
-        self.resize_listeners.push(resize_listener);
-    }
-
     /// Notifies all resize listeners (registered with `add_resize_listener()`, of a resize)
     pub(crate) fn notify_resize(&self, new_inner_width: u32, new_inner_height: u32) {
-        for x in &self.resize_listeners {
-            x.borrow_mut()
-                .resize_event(new_inner_width, new_inner_height);
+        let sys_rc = self
+            .systems
+            .upgrade()
+            .expect("Failed to get systems, maybe the Engine has been dropped");
+        let systems_ref = sys_rc.borrow();
+
+        if systems_ref.has_rendering() {
+            let mut rendering_sys = systems_ref
+                .rendering_mut()
+                .expect("Failed to borrow Rendering System");
+            rendering_sys.resize_event(new_inner_width, new_inner_height);
         }
     }
 }

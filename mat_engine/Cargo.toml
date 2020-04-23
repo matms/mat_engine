@@ -13,6 +13,7 @@ image = "0.23.4"
 futures = "0.3.4"
 imgui = "0.3.0"
 imgui-wgpu = "0.6.0"
+owning_ref = "0.4.1"
 
 # See https://github.com/Gekkio/imgui-rs/issues/305
 # Should be able to remove "=" when https://github.com/Gekkio/imgui-rs/pull/309 is merged
