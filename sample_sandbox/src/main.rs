@@ -111,9 +111,45 @@ fn main() {
         .start()
         .unwrap();
 
+    log::trace!("Starting random tests");
+    random_testing();
+    log::trace!("Ending random tests");
+
     log::trace!("Starting sample_sandbox");
 
     mat_engine::run(Box::new(MyApp {
         time: std::time::SystemTime::UNIX_EPOCH,
     }));
+}
+
+trait Testing {
+    fn quack(&self) -> String;
+}
+
+struct A;
+
+impl Testing for A {
+    fn quack(&self) -> String {
+        "Quack".into()
+    }
+}
+struct B;
+
+impl Testing for B {
+    fn quack(&self) -> String {
+        "I'm not a duck".into()
+    }
+}
+
+fn random_testing() {
+    let mut a = mat_engine::slotmap::Arena::<Box<dyn Testing>>::new();
+    let foo = a.insert(Box::new(A {}));
+    let bar = a.insert(Box::new(B {}));
+    *a.get_mut(foo).unwrap() = Box::new(B {});
+    *a.get_mut(bar).unwrap() = Box::new(A {});
+    log::info!(
+        "a[foo] = {}, a[bar]={}",
+        a.get(foo).unwrap().quack(),
+        a.get(bar).unwrap().quack()
+    )
 }

@@ -4,8 +4,6 @@
 //! systems that can easily be accessed and manipulated.
 //!
 //! The systems module implements the necessary utilities to manage this situation
-//!
-//! TODO: Actually put it into practice
 
 use crate::{imgui::ImguiSystem, render::RenderingSystem, windowing::WindowingSystem};
 use std::cell::{Ref, RefCell, RefMut};
@@ -18,13 +16,17 @@ use std::rc::{Rc, Weak};
 type SysCell<T> = Option<RefCell<T>>;
 type BoxErr = Box<dyn std::error::Error>;
 
+/// The `Engine` object encapsulates all the state necessary for the engine to run.
+/// It represents a form of quasi-global state, specifically subdivided into systems.
+/// The user receives a reference to the engine in `Application` trait functions.
 #[derive(Debug)]
 pub struct Engine {
     systems: Rc<RefCell<Systems>>,
 }
 
 impl Engine {
-    pub fn uninit() -> Engine {
+    /// Create new Engine with all systems uninitialized.
+    pub(crate) fn uninit() -> Engine {
         Engine {
             systems: Rc::new(RefCell::new(Systems::uninit())),
         }
@@ -34,18 +36,24 @@ impl Engine {
     /// NOT to store any of the `Ref` or `RefMut` objects, as that could cause conflicts if someone
     /// needs to mutably borrow the whole `Systems` object. Try to Drop them ASAP.
     ///
-    /// On the other hand, `&RefCell<Systems>`, which is what this function returns, may be stored.
-    /// Indeed, we expect that you will store it. As a matter of fact, the only reason the `Engine`
-    /// object exists is to reduce RefCell<>'s in user facing APIs, as a matter of simplicity.
+    /// On the other hand, `Weak<RefCell<Systems>>`, which is what this function returns,
+    /// may be stored. Indeed, we expect that you will store it. As a matter of fact, the only
+    /// reason the `Engine` object exists is to simplify `Application`'s API.
     /// In the future, `Engine` may gain further functionality, but for now, it is only a wrapper
-    /// around `RefCell<Systems>`.
+    /// around `Rc<RefCell<Systems>>`.
+    ///
+    /// When you actually need to use, upgrade the `rc::Weak` into `rc::Rc`. In theory, storing the
+    /// `Rc` shouldn't be a problem, and in fact might even be slightly faster. However, storing
+    /// `Weak` better expresses the fact that `RefCell<Systems>` is NOT owned by the systems,
+    /// there IS NO SHARED OWNERSHIP, we only use Rc/Weak because borrowck doesn't support
+    /// self-referential objects.
     pub fn systems_ref(&self) -> Weak<RefCell<Systems>> {
         Rc::downgrade(&self.systems)
     }
 }
 
-/// Important note: When you borrow systems from the `RefCell`, try not to keep references alive,
-/// instead borrow when you need, and then drop those references once you finish using them.
+/// Important note: When you borrow (specific) systems from the `RefCell`, try not to keep references
+/// alive. Instead, borrow when you need, and then drop those references once you finish using them.
 /// Do NOT store the `Ref` or `RefMut` objects, that could cause conflicts if someone needs to
 /// mutably borrow a system. Try to Drop them ASAP.
 pub struct Systems {
@@ -55,7 +63,7 @@ pub struct Systems {
 }
 
 impl Systems {
-    pub fn uninit() -> Systems {
+    fn uninit() -> Systems {
         Self {
             windowing: None,
             rendering: None,
@@ -147,7 +155,7 @@ impl Systems {
 
 impl std::fmt::Debug for Systems {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<systems>")
+        write!(f, "<Systems>")
     }
 }
 

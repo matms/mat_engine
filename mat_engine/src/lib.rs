@@ -3,6 +3,7 @@ use std::cell::RefCell;
 pub mod application;
 pub mod imgui;
 pub mod render;
+pub mod slotmap;
 pub mod systems;
 pub mod windowing;
 
