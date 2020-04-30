@@ -17,8 +17,6 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
 
     let mut engine = crate::systems::Engine::uninit();
 
-    let systems = engine.systems_rc();
-
     let winit_event_loop = winit::event_loop::EventLoop::<windowing::Request>::with_user_event();
     let winit_event_loop_proxy = winit_event_loop.create_proxy();
     let winit_window = winit::window::WindowBuilder::new()
@@ -27,6 +25,10 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
 
     // Create default systems.
     {
+        // Note that we are very careful to control the lifetime of systems. See the docs for
+        // engine.systems_rc() for more info.
+        let systems = engine.systems_rc();
+
         // Since systems may want to access the `Systems` object when creating themselves,
         // we must first create the system, then borrow `Systems`, then store the system,
         // and finally drop the borrow on `Systems`.
@@ -52,6 +54,10 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
     app.init(&mut engine);
 
     winit_event_loop.run(move |event, _, control_flow| {
+        // Note that we are very careful to control the lifetime of systems. See the docs for
+        // engine.systems_rc() for more info.
+        let systems = engine.systems_rc();
+
         // Immediately start the next loop once current is done, instead of waiting
         // for user input.
         // TODO: This may be useful for frame-rate limiting, I'm unsure. Need to examine.

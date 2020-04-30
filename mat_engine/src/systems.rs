@@ -53,7 +53,9 @@ impl Engine {
     }
 
     /// Attention: Do NOT store `Rc<RefCell<Systems>>` anywhere except inside of
-    /// a specific system located inside Systems.
+    /// a specific system located inside Systems. (Unless you know what you are doing).
+    ///
+    /// The Rc MUST NOT outlive Engine, if it does, that will cause a runtime panic when Engine is dropped.
     ///
     /// See impl of `Drop` trait for `Engine` to get an explanation for this.
     pub(crate) fn systems_rc(&self) -> Rc<RefCell<Systems>> {
@@ -77,13 +79,20 @@ impl std::ops::Drop for Engine {
         log::trace!("Dropping Engine");
         // The one place we expect `Rc` references to `Systems` is inside specific systems.
         // Therefore, we drop all systems here.
-        // TODO: Test...
+
+        log::trace!(
+            "Rc strong count: {}",
+            std::rc::Rc::strong_count(&self.systems)
+        );
+
+        log::trace!("Dropped");
         std::mem::drop(self.systems.replace(Systems::uninit()));
         // Do the actual guarding
         if std::rc::Rc::strong_count(&self.systems) != 1 {
             log::error!(
                 "Dropping Engine but unable to drop Systems because someone else holds a \
-                 strong reference (Rc) to it"
+                 strong reference (Rc) to it. Rc strong count: {}",
+                std::rc::Rc::strong_count(&self.systems)
             );
             panic!("Engine dropped, cannot drop Systems");
         }
