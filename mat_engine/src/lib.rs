@@ -1,14 +1,16 @@
-use std::cell::RefCell;
-
 #[macro_use]
 mod macros;
+mod typedefs;
 
 pub mod application;
 pub mod imgui;
 pub mod rendering;
+pub mod shaders;
 pub mod slotmap;
 pub mod systems;
 pub mod windowing;
+
+use std::cell::RefCell;
 
 /// Execute a given Application. Doesn't return, use the `Application::close()` method to
 /// handle shutdown.

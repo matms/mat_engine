@@ -5,16 +5,15 @@
 //!
 //! The systems module implements the necessary utilities to manage this situation
 
+use crate::typedefs::BoxErr;
 use crate::{imgui::ImguiSystem, rendering::RenderingSystem, windowing::WindowingSystem};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
 
-// TODO: Investigate Option<RefCell<T>> vs RefCell<Option<T>>
 // I think Option<RefCell<T>> is probably a nicer API to use, even if it means
 // you need another RefCell wrapping around Systems (see Engine).
 
-type SysCell<T> = Option<RefCell<T>>;
-type BoxErr = Box<dyn std::error::Error>;
+pub type SysCell<T> = Option<RefCell<T>>;
 
 /// The `Engine` object encapsulates all the state necessary for the engine to run.
 /// It represents a form of quasi-global state, specifically subdivided into systems.
@@ -77,24 +76,19 @@ impl std::ops::Drop for Engine {
     /// That is because we want to be sure that `Systems` will be dropped.
     fn drop(&mut self) {
         log::trace!("Dropping Engine");
+
         // The one place we expect `Rc` references to `Systems` is inside specific systems.
         // Therefore, we drop all systems here.
-
-        log::trace!(
-            "Rc strong count: {}",
-            std::rc::Rc::strong_count(&self.systems)
-        );
-
-        log::trace!("Dropped");
         std::mem::drop(self.systems.replace(Systems::uninit()));
-        // Do the actual guarding
+
+        // The one Rc is due to the Engine itself.
         if std::rc::Rc::strong_count(&self.systems) != 1 {
             log::error!(
                 "Dropping Engine but unable to drop Systems because someone else holds a \
                  strong reference (Rc) to it. Rc strong count: {}",
                 std::rc::Rc::strong_count(&self.systems)
             );
-            panic!("Engine dropped, cannot drop Systems");
+            panic!("Engine dropped but cannot drop Systems");
         }
         // Since the last Rc will be dropped automatically, `Systems` should be dropped.
     }

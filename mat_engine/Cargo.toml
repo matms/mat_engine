@@ -15,6 +15,15 @@ imgui = "0.3.0"
 imgui-wgpu = "0.6.0"
 #owning_ref = "0.4.1"
 slotmap = "0.4.0"
+lazy_static = "1.4.0"
+
+
+#TODO: Seek better alternative -> This takes a long time to build...
+#See shaderc docs for info on necessary deps for building.
+shaderc = "0.6"
+
+#I will probably use later... Specifically to check for padding for sending stuff to gpu...
+#static_assertions = "1.1.0"
 
 # See https://github.com/Gekkio/imgui-rs/issues/305
 # Should be able to remove "=" when https://github.com/Gekkio/imgui-rs/pull/309 is merged

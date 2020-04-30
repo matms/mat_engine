@@ -100,6 +100,8 @@ pub(crate) struct WgpuState {
     swap_chain_descriptor: wgpu::SwapChainDescriptor,
     swap_chain: wgpu::SwapChain,
 
+    render_pipeline: wgpu::RenderPipeline,
+
     window_inner_width: u32,
     window_inner_height: u32,
 }
@@ -158,6 +160,62 @@ impl WgpuState {
 
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_descriptor);
 
+        let vert_shader_data = wgpu::read_spirv(std::io::Cursor::new(
+            crate::shaders::default_vert_shader().as_ref(),
+        ))
+        .unwrap();
+
+        let frag_shader_data = wgpu::read_spirv(std::io::Cursor::new(
+            crate::shaders::default_frag_shader().as_ref(),
+        ))
+        .unwrap();
+
+        // TODO: Allow dynamically confinguring shaders.
+
+        let vert_shader_module = device.create_shader_module(&vert_shader_data);
+        let frag_shader_module = device.create_shader_module(&frag_shader_data);
+
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                bind_group_layouts: &[],
+            });
+
+        // https://sotrh.github.io/learn-wgpu/
+        // TODO: Allow dynamically creating new pipelines and swapping pipelines
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            layout: &render_pipeline_layout,
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
+                module: &vert_shader_module,
+                entry_point: "main",
+            },
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                module: &frag_shader_module,
+                entry_point: "main",
+            }),
+            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: wgpu::CullMode::Back,
+                depth_bias: 0,
+                depth_bias_slope_scale: 0.0,
+                depth_bias_clamp: 0.0,
+            }),
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList, // TODO: What does this do?
+            color_states: &[wgpu::ColorStateDescriptor {
+                format: swap_chain_descriptor.format,
+                alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                color_blend: wgpu::BlendDescriptor::REPLACE,
+                write_mask: wgpu::ColorWrite::ALL,
+            }],
+            depth_stencil_state: None,
+            vertex_state: wgpu::VertexStateDescriptor {
+                index_format: wgpu::IndexFormat::Uint16,
+                vertex_buffers: &[],
+            },
+            sample_count: 1,
+            sample_mask: !0, // All of them
+            alpha_to_coverage_enabled: false,
+        });
+
         Self {
             surface,
             adapter,
@@ -167,6 +225,7 @@ impl WgpuState {
             swap_chain,
             window_inner_width,
             window_inner_height,
+            render_pipeline,
         }
     }
 
@@ -194,16 +253,7 @@ impl WgpuState {
 
         let mut frt = FrameRenderTarget { frame, encoder };
 
-        self.clear_screen(&mut frt);
-
-        frt
-    }
-
-    fn complete_render(&mut self, frt: FrameRenderTarget) {
-        self.queue.submit(&[frt.encoder.finish()])
-    }
-
-    fn clear_screen(&mut self, frt: &mut FrameRenderTarget) {
+        // We use a scope here bc we need to borrow frt mutably.
         {
             let render_pass_descriptor = &wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -220,8 +270,17 @@ impl WgpuState {
                 }],
                 depth_stencil_attachment: None,
             };
-            let _render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
+            let mut render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
+            render_pass.set_pipeline(&self.render_pipeline);
+            render_pass.draw(0..3, 0..1);
         }
+
+        // Return frt so other people can render
+        frt
+    }
+
+    fn complete_render(&mut self, frt: FrameRenderTarget) {
+        self.queue.submit(&[frt.encoder.finish()])
     }
 }
 
