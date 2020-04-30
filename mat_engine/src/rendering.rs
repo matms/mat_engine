@@ -1,10 +1,10 @@
 // See https://sotrh.github.io/learn-wgpu/
 
-use std::{cell::RefCell, rc::Weak};
+use std::{cell::RefCell, rc::Rc};
 
 #[allow(dead_code, unused_variables)]
 pub struct RenderingSystem {
-    pub(crate) systems: Weak<RefCell<crate::systems::Systems>>,
+    pub(crate) systems: Rc<RefCell<crate::systems::Systems>>,
     pub(crate) state: WgpuState,
     pub(crate) frt: Option<FrameRenderTarget>,
 }
@@ -14,16 +14,21 @@ impl RenderingSystem {
     ///
     /// Needs mutable borrow of the windowing system because it adds itself as a listener
     /// to certain window events (specifically, for now, it listens to resizes).
-    pub(crate) fn new(systems: Weak<RefCell<crate::systems::Systems>>) -> Self {
-        let sys_rc = systems
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
+    pub(crate) fn new(engine: &crate::systems::Engine) -> Self {
+        // We take in `Engine` instead of `Rc<RefCell<Systems>>` bc the systems_rc() method is
+        // pub(crate), and we don't want to have to expose it. However, to reduce coupling,
+        // the only access to engine should be this line. If it is the case that this function is
+        // also pub(crate) (i.e. the system is created automatically, by the engine) then the
+        // above reason doesn't apply: Instead, we take in Engine for consistency with systems
+        // for which the above is the case.
+        let systems = engine.systems_rc();
+
+        let systems_ref = systems.borrow();
         let windowing_system = systems_ref
             .windowing()
             .expect("Failed to Borrow the Windowing System. Note that you must create the Windowing System BEFORE the Rendering System");
         Self {
-            systems,
+            systems: systems.clone(),
             state: WgpuState::new(
                 windowing_system.get_window_ref(),
                 windowing_system.get_window_ref().inner_size().width,
@@ -72,6 +77,8 @@ impl RenderingSystem {
         )
     }
 
+    /// Use to get mutable borrows of both state and frt. Needed bc. borrowck cannot properly
+    /// resolve the splitting borrow from other places.
     pub(crate) fn state_and_frt(&mut self) -> (&mut WgpuState, &mut Option<FrameRenderTarget>) {
         return (&mut self.state, &mut self.frt);
     }

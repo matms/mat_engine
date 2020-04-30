@@ -8,27 +8,14 @@ impl mat_engine::application::Application for MyApp {
     fn init(&mut self, engine: &mut mat_engine::systems::Engine) {
         self.time = std::time::SystemTime::now();
 
-        let sys_rc = engine
-            .systems_ref()
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
+        let imgui_sys = Some(RefCell::new(mat_engine::imgui::ImguiSystem::new(engine)));
 
-        let imgui_sys = Some(RefCell::new(mat_engine::imgui::ImguiSystem::new(
-            engine.systems_ref(),
-        )));
-
-        let mut systems_mut = sys_rc.borrow_mut();
-        systems_mut.set_imgui(imgui_sys);
+        engine.systems_borrow_mut().set_imgui(imgui_sys);
     }
 
     fn update(&mut self, engine: &mut mat_engine::systems::Engine) {
-        let sys_rc = engine
-            .systems_ref()
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
-
-        systems_ref
+        engine
+            .systems_borrow()
             .imgui_mut()
             .expect("Imgui system not init.")
             .update();
@@ -43,20 +30,16 @@ impl mat_engine::application::Application for MyApp {
 
         //log::trace!("Last frame duration {}us", _dur.as_micros());
 
-        let sys_rc = engine
-            .systems_ref()
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
-
-        systems_ref
+        engine
+            .systems_borrow()
             .rendering_mut()
-            .expect("Render sys not init.")
+            .unwrap()
             .start_render();
 
         //Render imgui
 
-        systems_ref
+        engine
+            .systems_borrow()
             .imgui_mut()
             .expect("Imgui sys not init.")
             .add_render_fn(|ui| {
@@ -76,12 +59,14 @@ impl mat_engine::application::Application for MyApp {
                     });
             });
 
-        systems_ref
+        engine
+            .systems_borrow()
             .imgui_mut()
             .expect("Imgui sys not init.")
             .render();
 
-        systems_ref
+        engine
+            .systems_borrow()
             .rendering_mut()
             .expect("Rendering sys not init.")
             .complete_render();
@@ -92,13 +77,8 @@ impl mat_engine::application::Application for MyApp {
         engine: &mut mat_engine::systems::Engine,
         event: &winit::event::Event<mat_engine::windowing::Request>,
     ) {
-        let sys_rc = engine
-            .systems_ref()
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
-
-        systems_ref
+        engine
+            .systems_borrow()
             .imgui_mut()
             .expect("Imgui sys not init.")
             .process_event(event);

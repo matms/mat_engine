@@ -1,10 +1,10 @@
 use std::cell::RefCell;
-use std::rc::Weak;
+use std::rc::Rc;
 
 /// ImguiSystem is not a core system, and is not automatically initialized. The user
 /// must initialize and manage it.
 pub struct ImguiSystem {
-    pub(crate) systems: Weak<RefCell<crate::systems::Systems>>,
+    pub(crate) systems: Rc<RefCell<crate::systems::Systems>>,
     imgui_ctx: ::imgui::Context,
     imgui_winit_platform: imgui_winit_support::WinitPlatform,
     renderer: imgui_wgpu::Renderer,
@@ -12,11 +12,16 @@ pub struct ImguiSystem {
 }
 
 impl ImguiSystem {
-    pub fn new(systems: Weak<RefCell<crate::systems::Systems>>) -> Self {
-        let sys_rc = systems
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
+    pub fn new(engine: &crate::systems::Engine) -> Self {
+        // We take in `Engine` instead of `Rc<RefCell<Systems>>` bc the systems_rc() method is
+        // pub(crate), and we don't want to have to expose it. However, to reduce coupling,
+        // the only access to engine should be this line. If it is the case that this function is
+        // also pub(crate) (i.e. the system is created automatically, by the engine) then the
+        // above reason doesn't apply: Instead, we take in Engine for consistency with systems
+        // for which the above is the case.
+        let systems = engine.systems_rc();
+
+        let systems_ref = systems.borrow();
 
         let ws = systems_ref.windowing().expect("Failed to Borrow the Windowing System. Note that you must create the Windowing System BEFORE the Imgui System");
         let mut rs = systems_ref.rendering_mut().expect("Failed to Borrow the Rendering System. Note that you must create the Rendering System BEFORE the Imgui System");
@@ -44,7 +49,7 @@ impl ImguiSystem {
         let renderer = rs.make_imgui_wgpu_renderer(&mut imgui_ctx);
 
         Self {
-            systems,
+            systems: systems.clone(),
             imgui_ctx,
             imgui_winit_platform,
             renderer,
@@ -53,11 +58,7 @@ impl ImguiSystem {
     }
 
     pub fn update(&mut self) {
-        let sys_rc = self
-            .systems
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
+        let systems_ref = self.systems.borrow();
 
         let ws = systems_ref
             .windowing()
@@ -81,11 +82,7 @@ impl ImguiSystem {
     }
 
     pub fn render(&mut self) {
-        let sys_rc = self
-            .systems
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
+        let systems_ref = self.systems.borrow();
 
         let ws = systems_ref
             .windowing()
@@ -125,11 +122,7 @@ impl ImguiSystem {
     }
 
     pub fn process_event(&mut self, event: &winit::event::Event<crate::windowing::Request>) {
-        let sys_rc = self
-            .systems
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
+        let systems_ref = self.systems.borrow();
 
         let ws = systems_ref
             .windowing()

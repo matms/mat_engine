@@ -1,8 +1,11 @@
 use std::cell::RefCell;
 
+#[macro_use]
+mod macros;
+
 pub mod application;
 pub mod imgui;
-pub mod render;
+pub mod rendering;
 pub mod slotmap;
 pub mod systems;
 pub mod windowing;
@@ -14,7 +17,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
 
     let mut engine = crate::systems::Engine::uninit();
 
-    let systems = engine.systems_ref();
+    let systems = engine.systems_rc();
 
     let winit_event_loop = winit::event_loop::EventLoop::<windowing::Request>::with_user_event();
     let winit_event_loop_proxy = winit_event_loop.create_proxy();
@@ -22,31 +25,27 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
         .build(&winit_event_loop)
         .expect("Could not obtain winit window");
 
+    // Create default systems.
     {
-        let sys_rc = systems
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-
         // Since systems may want to access the `Systems` object when creating themselves,
-        // we must first create the system then borrow `Systems`, store the system,
+        // we must first create the system, then borrow `Systems`, then store the system,
         // and finally drop the borrow on `Systems`.
         {
-            let ws = Some(RefCell::new(windowing::WindowingSystem {
-                systems: systems.clone(),
+            let ws = Some(RefCell::new(crate::windowing::WindowingSystem::new(
+                &engine,
                 winit_window,
                 winit_event_loop_proxy,
-                force_quit: false,
-            }));
+            )));
 
-            sys_rc.borrow_mut().set_windowing(ws);
+            systems.borrow_mut().set_windowing(ws);
         }
 
         {
-            let rs = Some(RefCell::new(crate::render::RenderingSystem::new(
-                systems.clone(),
+            let rs = Some(RefCell::new(crate::rendering::RenderingSystem::new(
+                &engine,
             )));
 
-            sys_rc.borrow_mut().set_rendering(rs);
+            systems.borrow_mut().set_rendering(rs);
         }
     }
 
@@ -65,14 +64,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
         // Even when we set *control_flow to Exit, winit still wants to go through the
         // outstanding events. If we wish to skip this, we can use force_quit to ignore
         // all the events until the quitting actually occurs.
-        } else if systems
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped")
-            .borrow()
-            .windowing()
-            .unwrap()
-            .force_quit
-        {
+        } else if systems.borrow().windowing().unwrap().force_quit {
             log::trace!("Force quitting... ignoring outsanding event");
             *control_flow = winit::event_loop::ControlFlow::Exit;
         } else {
@@ -102,10 +94,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                     event: winit::event::WindowEvent::Resized(new_size),
                     ..
                 } => {
-                    let sys_rc = systems
-                        .upgrade()
-                        .expect("Failed to get systems, maybe the Engine has been dropped");
-                    let systems_ref = sys_rc.borrow();
+                    let systems_ref = systems.borrow();
 
                     systems_ref
                         .windowing()
@@ -116,10 +105,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                     event: winit::event::WindowEvent::ScaleFactorChanged { new_inner_size, .. },
                     ..
                 } => {
-                    let sys_rc = systems
-                        .upgrade()
-                        .expect("Failed to get systems, maybe the Engine has been dropped");
-                    let systems_ref = sys_rc.borrow();
+                    let systems_ref = systems.borrow();
 
                     systems_ref
                         .windowing()
@@ -131,10 +117,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                     app.update(&mut engine);
 
                     {
-                        let sys_rc = systems
-                            .upgrade()
-                            .expect("Failed to get systems, maybe the Engine has been dropped");
-                        let systems_ref = sys_rc.borrow();
+                        let systems_ref = systems.borrow();
 
                         systems_ref
                             .windowing_mut()

@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::rc::Weak;
+use std::rc::Rc;
 
 // TODO: Refactor into better, more general event system
 
@@ -12,13 +12,34 @@ pub(crate) trait ResizeListener {
 }
 
 pub struct WindowingSystem {
-    pub(crate) systems: Weak<RefCell<crate::systems::Systems>>,
+    pub(crate) systems: Rc<RefCell<crate::systems::Systems>>,
     pub(crate) winit_window: winit::window::Window,
     pub(crate) winit_event_loop_proxy: winit::event_loop::EventLoopProxy<Request>,
     pub(crate) force_quit: bool,
 }
 
 impl WindowingSystem {
+    pub(crate) fn new(
+        engine: &crate::systems::Engine,
+        winit_window: winit::window::Window,
+        winit_event_loop_proxy: winit::event_loop::EventLoopProxy<Request>,
+    ) -> Self {
+        // We take in `Engine` instead of `Rc<RefCell<Systems>>` bc the systems_rc() method is
+        // pub(crate), and we don't want to have to expose it. However, to reduce coupling,
+        // the only access to engine should be this line. If it is the case that this function is
+        // also pub(crate) (i.e. the system is created automatically, by the engine) then the
+        // above reason doesn't apply: Instead, we take in Engine for consistency with systems
+        // for which the above is the case.
+        let systems = engine.systems_rc();
+
+        Self {
+            systems,
+            winit_window,
+            winit_event_loop_proxy,
+            force_quit: false,
+        }
+    }
+
     /// Sends a quit request to winit's event loop. This will, (possibly after a delay, as
     /// queued events will still be processed), cause the loop to exit. Application::close()
     /// will be automatically called, there is no need for you to call it.
@@ -39,13 +60,8 @@ impl WindowingSystem {
         &self.winit_window
     }
 
-    /// Notifies all resize listeners (registered with `add_resize_listener()`, of a resize)
     pub(crate) fn notify_resize(&self, new_inner_width: u32, new_inner_height: u32) {
-        let sys_rc = self
-            .systems
-            .upgrade()
-            .expect("Failed to get systems, maybe the Engine has been dropped");
-        let systems_ref = sys_rc.borrow();
+        let systems_ref = self.systems.borrow();
 
         if systems_ref.has_rendering() {
             let mut rendering_sys = systems_ref

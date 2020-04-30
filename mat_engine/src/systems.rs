@@ -5,7 +5,7 @@
 //!
 //! The systems module implements the necessary utilities to manage this situation
 
-use crate::{imgui::ImguiSystem, render::RenderingSystem, windowing::WindowingSystem};
+use crate::{imgui::ImguiSystem, rendering::RenderingSystem, windowing::WindowingSystem};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
 
@@ -32,6 +32,7 @@ impl Engine {
         }
     }
 
+    // TODO: Maybe remove and simply pass rc to the systems
     /// Important note: When you borrow the `Systems` object from the `RefCell`, make sure
     /// NOT to store any of the `Ref` or `RefMut` objects, as that could cause conflicts if someone
     /// needs to mutably borrow the whole `Systems` object. Try to Drop them ASAP.
@@ -49,6 +50,44 @@ impl Engine {
     /// self-referential objects.
     pub fn systems_ref(&self) -> Weak<RefCell<Systems>> {
         Rc::downgrade(&self.systems)
+    }
+
+    /// Attention: Do NOT store `Rc<RefCell<Systems>>` anywhere except inside of
+    /// a specific system located inside Systems.
+    ///
+    /// See impl of `Drop` trait for `Engine` to get an explanation for this.
+    pub(crate) fn systems_rc(&self) -> Rc<RefCell<Systems>> {
+        self.systems.clone()
+    }
+
+    pub fn systems_borrow(&self) -> Ref<Systems> {
+        self.systems.borrow()
+    }
+
+    pub fn systems_borrow_mut(&self) -> RefMut<Systems> {
+        self.systems.borrow_mut()
+    }
+}
+
+impl std::ops::Drop for Engine {
+    /// Guards against leakage of `Systems`. We may, at some point, choose to give out `Rc`s to users
+    /// or pass them into systems, but we wish to ensure that they don't outlive Engine.
+    /// That is because we want to be sure that `Systems` will be dropped.
+    fn drop(&mut self) {
+        log::trace!("Dropping Engine");
+        // The one place we expect `Rc` references to `Systems` is inside specific systems.
+        // Therefore, we drop all systems here.
+        // TODO: Test...
+        std::mem::drop(self.systems.replace(Systems::uninit()));
+        // Do the actual guarding
+        if std::rc::Rc::strong_count(&self.systems) != 1 {
+            log::error!(
+                "Dropping Engine but unable to drop Systems because someone else holds a \
+                 strong reference (Rc) to it"
+            );
+            panic!("Engine dropped, cannot drop Systems");
+        }
+        // Since the last Rc will be dropped automatically, `Systems` should be dropped.
     }
 }
 
