@@ -66,6 +66,8 @@ pub(crate) fn compile_glsl_to_spirv_asm<S: AsRef<str>>(
     file_name: S,
     shader_type: ShaderType,
 ) -> String {
+    warn_incorrect_shader_type(&file_name, shader_type);
+
     let mut compiler = shaderc::Compiler::new().unwrap();
     let options = shaderc::CompileOptions::new().unwrap();
 

@@ -2,11 +2,17 @@
 
 use std::{cell::RefCell, rc::Rc};
 
+enum FrtHolder {
+    Owned(FrameRenderTarget),
+    Given, // Someone called take_frt() but didn't yet return_frt()
+    None,
+}
+
 #[allow(dead_code, unused_variables)]
 pub struct RenderingSystem {
     pub(crate) systems: Rc<RefCell<crate::systems::Systems>>,
     pub(crate) state: WgpuState,
-    pub(crate) frt: Option<FrameRenderTarget>,
+    frt: FrtHolder,
 }
 
 impl RenderingSystem {
@@ -34,19 +40,72 @@ impl RenderingSystem {
                 windowing_system.get_window_ref().inner_size().width,
                 windowing_system.get_window_ref().inner_size().height,
             ),
-            frt: None,
+            frt: FrtHolder::None,
         }
     }
 
     pub fn start_render(&mut self) {
-        self.frt = Some(self.state.start_render());
+        let mut frt = self.state.start_frame_render();
+
+        // We use a scope here bc we need to borrow frt mutably.
+        {
+            let mut render_pass = self.state.make_render_pass(&mut frt);
+
+            render_pass.wgpu_render_pass().draw(0..3, 0..1);
+        }
+
+        self.frt = FrtHolder::Owned(frt);
+    }
+
+    pub fn take_frt(&mut self) -> FrameRenderTarget {
+        match self.frt {
+            FrtHolder::Owned(_) => {
+                let x = std::mem::replace(&mut self.frt, FrtHolder::Given);
+                if let FrtHolder::Owned(y) = x {
+                    y
+                } else {
+                    unreachable!()
+                }
+            }
+            FrtHolder::Given => {
+                log::error!(
+                    "Frame render target was taken from Rendering system but not given back yet."
+                );
+                panic!(
+                    "Frame render target was taken from Rendering system but not given back yet."
+                );
+            }
+            FrtHolder::None => {
+                log::error!("No frame render target.");
+                panic!("No frame render target.");
+            }
+        }
     }
 
     pub fn complete_render(&mut self) {
-        self.state.complete_render(
-            std::mem::replace(&mut self.frt, None)
-                .expect("No frame render target: You must've forgotten to call start_render()"),
-        );
+        match self.frt {
+            FrtHolder::Owned(_) => {
+                let x = std::mem::replace(&mut self.frt, FrtHolder::None);
+
+                if let FrtHolder::Owned(y) = x {
+                    self.state.complete_frame_render(y);
+                } else {
+                    unreachable!();
+                }
+            }
+            FrtHolder::Given => {
+                log::error!(
+                    "Frame render target was taken from Rendering system but not given back yet."
+                );
+                panic!(
+                    "Frame render target was taken from Rendering system but not given back yet."
+                );
+            }
+            FrtHolder::None => {
+                log::error!("No frame render target.");
+                panic!("No frame render target.");
+            }
+        };
     }
 
     #[cfg(not(feature = "glsl-to-spirv"))]
@@ -79,8 +138,24 @@ impl RenderingSystem {
 
     /// Use to get mutable borrows of both state and frt. Needed bc. borrowck cannot properly
     /// resolve the splitting borrow from other places.
-    pub(crate) fn state_and_frt(&mut self) -> (&mut WgpuState, &mut Option<FrameRenderTarget>) {
-        return (&mut self.state, &mut self.frt);
+    pub(crate) fn state_and_frt(&mut self) -> (&mut WgpuState, &mut FrameRenderTarget) {
+        match &mut self.frt {
+            FrtHolder::Owned(x) => {
+                return (&mut self.state, x);
+            }
+            FrtHolder::Given => {
+                log::error!(
+                    "Frame render target was taken from Rendering system but not given back yet."
+                );
+                panic!(
+                    "Frame render target was taken from Rendering system but not given back yet."
+                );
+            }
+            FrtHolder::None => {
+                log::error!("No frame render target.");
+                panic!("No frame render target.");
+            }
+        };
     }
 }
 
@@ -100,7 +175,7 @@ pub(crate) struct WgpuState {
     swap_chain_descriptor: wgpu::SwapChainDescriptor,
     swap_chain: wgpu::SwapChain,
 
-    render_pipeline: wgpu::RenderPipeline,
+    default_render_pipeline: wgpu::RenderPipeline,
 
     window_inner_width: u32,
     window_inner_height: u32,
@@ -182,39 +257,40 @@ impl WgpuState {
 
         // https://sotrh.github.io/learn-wgpu/
         // TODO: Allow dynamically creating new pipelines and swapping pipelines
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &render_pipeline_layout,
-            vertex_stage: wgpu::ProgrammableStageDescriptor {
-                module: &vert_shader_module,
-                entry_point: "main",
-            },
-            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                module: &frag_shader_module,
-                entry_point: "main",
-            }),
-            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::Back,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0,
-            }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList, // TODO: What does this do?
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: swap_chain_descriptor.format,
-                alpha_blend: wgpu::BlendDescriptor::REPLACE,
-                color_blend: wgpu::BlendDescriptor::REPLACE,
-                write_mask: wgpu::ColorWrite::ALL,
-            }],
-            depth_stencil_state: None,
-            vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint16,
-                vertex_buffers: &[],
-            },
-            sample_count: 1,
-            sample_mask: !0, // All of them
-            alpha_to_coverage_enabled: false,
-        });
+        let default_render_pipeline =
+            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                layout: &render_pipeline_layout,
+                vertex_stage: wgpu::ProgrammableStageDescriptor {
+                    module: &vert_shader_module,
+                    entry_point: "main",
+                },
+                fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                    module: &frag_shader_module,
+                    entry_point: "main",
+                }),
+                rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: wgpu::CullMode::Back,
+                    depth_bias: 0,
+                    depth_bias_slope_scale: 0.0,
+                    depth_bias_clamp: 0.0,
+                }),
+                primitive_topology: wgpu::PrimitiveTopology::TriangleList, // TODO: What does this do?
+                color_states: &[wgpu::ColorStateDescriptor {
+                    format: swap_chain_descriptor.format,
+                    alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                    color_blend: wgpu::BlendDescriptor::REPLACE,
+                    write_mask: wgpu::ColorWrite::ALL,
+                }],
+                depth_stencil_state: None,
+                vertex_state: wgpu::VertexStateDescriptor {
+                    index_format: wgpu::IndexFormat::Uint16,
+                    vertex_buffers: &[],
+                },
+                sample_count: 1,
+                sample_mask: !0, // All of them
+                alpha_to_coverage_enabled: false,
+            });
 
         Self {
             surface,
@@ -225,7 +301,7 @@ impl WgpuState {
             swap_chain,
             window_inner_width,
             window_inner_height,
-            render_pipeline,
+            default_render_pipeline,
         }
     }
 
@@ -240,7 +316,9 @@ impl WgpuState {
             .create_swap_chain(&self.surface, &self.swap_chain_descriptor);
     }
 
-    fn start_render(&mut self) -> FrameRenderTarget {
+    /// Returns a `FrameRenderTarget`, which will be used for rendering and must be
+    /// given back to complete_frame_render().
+    fn start_frame_render(&mut self) -> FrameRenderTarget {
         let frame = self.swap_chain.get_next_texture().unwrap();
 
         let command_encoder_descriptor = &wgpu::CommandEncoderDescriptor {
@@ -251,36 +329,48 @@ impl WgpuState {
             .device
             .create_command_encoder(command_encoder_descriptor);
 
-        let mut frt = FrameRenderTarget { frame, encoder };
+        let frt = FrameRenderTarget { frame, encoder };
 
-        // We use a scope here bc we need to borrow frt mutably.
-        {
-            let render_pass_descriptor = &wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frt.frame.view,
-                    resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: 0.3,
-                        a: 1.0,
-                    },
-                }],
-                depth_stencil_attachment: None,
-            };
-            let mut render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.draw(0..3, 0..1);
-        }
-
-        // Return frt so other people can render
         frt
     }
 
-    fn complete_render(&mut self, frt: FrameRenderTarget) {
+    fn complete_frame_render(&mut self, frt: FrameRenderTarget) {
         self.queue.submit(&[frt.encoder.finish()])
+    }
+
+    fn make_render_pass<'a>(&'a self, frt: &'a mut FrameRenderTarget) -> RenderPass<'a> {
+        let render_pass_descriptor = &wgpu::RenderPassDescriptor {
+            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                attachment: &frt.frame.view,
+                resolve_target: None,
+                load_op: wgpu::LoadOp::Clear,
+                store_op: wgpu::StoreOp::Store,
+                clear_color: wgpu::Color {
+                    r: 0.1,
+                    g: 0.2,
+                    b: 0.3,
+                    a: 1.0,
+                },
+            }],
+            depth_stencil_attachment: None,
+        };
+        let mut render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
+
+        render_pass.set_pipeline(&self.default_render_pipeline);
+
+        RenderPass {
+            wgpu_render_pass: render_pass,
+        }
+    }
+}
+
+pub struct RenderPass<'a> {
+    wgpu_render_pass: wgpu::RenderPass<'a>,
+}
+
+impl<'a> RenderPass<'a> {
+    fn wgpu_render_pass(&mut self) -> &mut wgpu::RenderPass<'a> {
+        &mut self.wgpu_render_pass
     }
 }
 

@@ -100,14 +100,12 @@ impl ImguiSystem {
 
         self.imgui_winit_platform
             .prepare_render(&ui, ws.get_window_ref());
-        // TODO ACTUALLY RENDER
+
         let draw_data = ui.render();
 
         {
             // Split borrow -> state_and_frt is needed bc. borrowck is stupid.
             let (rs_state, frt) = rs.state_and_frt();
-
-            let frt = frt.as_mut().unwrap();
 
             let encoder = &mut frt.encoder;
 
