@@ -15,30 +15,30 @@
 pub trait Application {
     /// Called once, at initialization.
     #[allow(unused_variables)]
-    fn init(&mut self, engine: &mut crate::systems::Engine) {
+    fn init(&mut self, ctx: &mut crate::context::EngineContext) {
         log::trace!("Application initialized. User should probably override Application::init()");
     }
 
     /// Called once the engine wants to close. For e.g. you may save information here.
     /// DO NOT CALL DIRECTLY FROM USER CODE, IT WILL NOT CLOSE THE APP.
     #[allow(unused_variables)]
-    fn close(&mut self, engine: &mut crate::systems::Engine) {
+    fn close(&mut self, ctx: &mut crate::context::EngineContext) {
         log::trace!("Application closed");
     }
 
     /// Called once per frame, after handling events but before rendering
     #[allow(unused_variables)]
-    fn update(&mut self, engine: &mut crate::systems::Engine) {}
+    fn update(&mut self, ctx: &mut crate::context::EngineContext) {}
 
     /// Called once per frame, after `Application::update()`
     #[allow(unused_variables)]
-    fn render(&mut self, engine: &mut crate::systems::Engine) {}
+    fn render(&mut self, ctx: &mut crate::context::EngineContext) {}
 
     /// TEMPORARY -> TODO REFACTOR:
     #[allow(unused_variables)]
     fn event_postprocessor(
         &mut self,
-        engine: &mut crate::systems::Engine,
+        ctx: &mut crate::context::EngineContext,
         event: &winit::event::Event<crate::windowing::Request>,
     ) {
     }

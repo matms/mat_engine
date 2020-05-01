@@ -1,23 +1,23 @@
 #[macro_use]
 mod macros;
-mod typedefs;
+mod utils;
 
 pub mod application;
+pub mod context;
 pub mod imgui;
 pub mod rendering;
 pub mod shaders;
 pub mod slotmap;
-pub mod systems;
 pub mod windowing;
 
-use std::cell::RefCell;
+pub use context::EngineContext;
 
 /// Execute a given Application. Doesn't return, use the `Application::close()` method to
 /// handle shutdown.
 pub fn run(mut app: Box<dyn application::Application>) -> ! {
     log::trace!("Starting mat_engine");
 
-    let mut engine = crate::systems::Engine::uninit();
+    let mut ctx = context::EngineContext::uninit();
 
     let winit_event_loop = winit::event_loop::EventLoop::<windowing::Request>::with_user_event();
     let winit_event_loop_proxy = winit_event_loop.create_proxy();
@@ -25,41 +25,20 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
         .build(&winit_event_loop)
         .expect("Could not obtain winit window");
 
-    // Create default systems.
-    {
-        // Note that we are very careful to control the lifetime of systems. See the docs for
-        // engine.systems_rc() for more info.
-        let systems = engine.systems_rc();
+    ctx.windowing_context = Some(windowing::WindowingSystem::new(
+        winit_window,
+        winit_event_loop_proxy,
+    ));
 
-        // Since systems may want to access the `Systems` object when creating themselves,
-        // we must first create the system, then borrow `Systems`, then store the system,
-        // and finally drop the borrow on `Systems`.
-        {
-            let ws = Some(RefCell::new(crate::windowing::WindowingSystem::new(
-                &engine,
-                winit_window,
-                winit_event_loop_proxy,
-            )));
+    ctx.rendering_context = Some(rendering::RenderingSystem::new(
+        &ctx.windowing_context
+            .as_mut()
+            .expect("Need windowing context to make rendering context"),
+    ));
 
-            systems.borrow_mut().set_windowing(ws);
-        }
-
-        {
-            let rs = Some(RefCell::new(crate::rendering::RenderingSystem::new(
-                &engine,
-            )));
-
-            systems.borrow_mut().set_rendering(rs);
-        }
-    }
-
-    app.init(&mut engine);
+    app.init(&mut ctx);
 
     winit_event_loop.run(move |event, _, control_flow| {
-        // Note that we are very careful to control the lifetime of systems. See the docs for
-        // engine.systems_rc() for more info.
-        let systems = engine.systems_rc();
-
         // Immediately start the next loop once current is done, instead of waiting
         // for user input.
         // TODO: This may be useful for frame-rate limiting, I'm unsure. Need to examine.
@@ -67,12 +46,12 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
 
         // If the application is to be closed, we may skip everything below, and just quit.
         if let winit::event::Event::LoopDestroyed = event {
-            app.close(&mut engine);
+            app.close(&mut ctx);
             log::trace!("Ending mat_engine");
         // Even when we set *control_flow to Exit, winit still wants to go through the
         // outstanding events. If we wish to skip this, we can use force_quit to ignore
         // all the events until the quitting actually occurs.
-        } else if systems.borrow().windowing().unwrap().force_quit {
+        } else if ctx.windowing_context.as_mut().unwrap().force_quit {
             log::trace!("Force quitting... ignoring outsanding event");
             *control_flow = winit::event_loop::ControlFlow::Exit;
         } else {
@@ -102,40 +81,28 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                     event: winit::event::WindowEvent::Resized(new_size),
                     ..
                 } => {
-                    let systems_ref = systems.borrow();
-
-                    systems_ref
-                        .windowing()
-                        .unwrap()
-                        .notify_resize(new_size.width, new_size.height);
+                    windowing::notify_resize(&mut ctx, new_size.width, new_size.height);
                 }
                 winit::event::Event::WindowEvent {
                     event: winit::event::WindowEvent::ScaleFactorChanged { new_inner_size, .. },
                     ..
                 } => {
-                    let systems_ref = systems.borrow();
-
-                    systems_ref
-                        .windowing()
-                        .unwrap()
-                        .notify_resize(new_inner_size.width, new_inner_size.height);
+                    windowing::notify_resize(&mut ctx, new_inner_size.width, new_inner_size.height);
                 }
                 // --------------------------------------------------
                 winit::event::Event::MainEventsCleared => {
-                    app.update(&mut engine);
+                    app.update(&mut ctx);
 
                     {
-                        let systems_ref = systems.borrow();
-
-                        systems_ref
-                            .windowing_mut()
+                        ctx.windowing_context
+                            .as_mut()
                             .unwrap()
                             .winit_window
                             .request_redraw();
                     }
                 }
                 winit::event::Event::RedrawRequested(_) => {
-                    app.render(&mut engine);
+                    app.render(&mut ctx);
                 }
                 winit::event::Event::LoopDestroyed => {
                     unreachable!("Should be handled by if let");
@@ -148,7 +115,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                 }
             }
 
-            app.event_postprocessor(&mut engine, &event);
+            app.event_postprocessor(&mut ctx, &event);
         }
     })
 }

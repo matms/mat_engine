@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 // TODO: Refactor into better, more general event system
 
 /// Used to allow systems to be notified whenever the window is resized
@@ -12,7 +9,6 @@ pub(crate) trait ResizeListener {
 }
 
 pub struct WindowingSystem {
-    pub(crate) systems: Rc<RefCell<crate::systems::Systems>>,
     pub(crate) winit_window: winit::window::Window,
     pub(crate) winit_event_loop_proxy: winit::event_loop::EventLoopProxy<Request>,
     pub(crate) force_quit: bool,
@@ -20,20 +16,10 @@ pub struct WindowingSystem {
 
 impl WindowingSystem {
     pub(crate) fn new(
-        engine: &crate::systems::Engine,
         winit_window: winit::window::Window,
         winit_event_loop_proxy: winit::event_loop::EventLoopProxy<Request>,
     ) -> Self {
-        // We take in `Engine` instead of `Rc<RefCell<Systems>>` bc the systems_rc() method is
-        // pub(crate), and we don't want to have to expose it. However, to reduce coupling,
-        // the only access to engine should be this line. If it is the case that this function is
-        // also pub(crate) (i.e. the system is created automatically, by the engine) then the
-        // above reason doesn't apply: Instead, we take in Engine for consistency with systems
-        // for which the above is the case.
-        let systems = engine.systems_rc();
-
         Self {
-            systems,
             winit_window,
             winit_event_loop_proxy,
             force_quit: false,
@@ -59,15 +45,17 @@ impl WindowingSystem {
     pub(crate) fn get_window_ref(&self) -> &winit::window::Window {
         &self.winit_window
     }
+}
 
-    pub(crate) fn notify_resize(&self, new_inner_width: u32, new_inner_height: u32) {
-        let systems_ref = self.systems.borrow();
-
-        if systems_ref.has_rendering() {
-            let mut rendering_sys = systems_ref
-                .rendering_mut()
-                .expect("Failed to borrow Rendering System");
-            rendering_sys.resize_event(new_inner_width, new_inner_height);
+pub(crate) fn notify_resize(
+    context: &mut crate::context::EngineContext,
+    new_inner_width: u32,
+    new_inner_height: u32,
+) {
+    match &mut context.rendering_context {
+        None => {}
+        Some(rc) => {
+            rc.resize_event(new_inner_width, new_inner_height);
         }
     }
 }

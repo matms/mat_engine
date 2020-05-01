@@ -1,27 +1,18 @@
-use std::cell::RefCell;
-
 struct MyApp {
     time: std::time::SystemTime,
 }
 
 impl mat_engine::application::Application for MyApp {
-    fn init(&mut self, engine: &mut mat_engine::systems::Engine) {
+    fn init(&mut self, ctx: &mut mat_engine::context::EngineContext) {
         self.time = std::time::SystemTime::now();
-
-        let imgui_sys = Some(RefCell::new(mat_engine::imgui::ImguiSystem::new(engine)));
-
-        engine.systems_borrow_mut().set_imgui(imgui_sys);
+        ctx.imgui_init();
     }
 
-    fn update(&mut self, engine: &mut mat_engine::systems::Engine) {
-        engine
-            .systems_borrow()
-            .imgui_mut()
-            .expect("Imgui system not init.")
-            .update();
+    fn update(&mut self, ctx: &mut mat_engine::context::EngineContext) {
+        mat_engine::imgui::update(ctx);
     }
 
-    fn render(&mut self, engine: &mut mat_engine::systems::Engine) {
+    fn render(&mut self, ctx: &mut mat_engine::context::EngineContext) {
         let new_time = std::time::SystemTime::now();
         let _dur = new_time
             .duration_since(self.time)
@@ -30,58 +21,37 @@ impl mat_engine::application::Application for MyApp {
 
         //log::trace!("Last frame duration {}us", _dur.as_micros());
 
-        engine
-            .systems_borrow()
-            .rendering_mut()
-            .unwrap()
-            .start_render();
+        mat_engine::rendering::start_render(ctx);
 
         //Render imgui
+        mat_engine::imgui::add_render_fn(ctx, |ui| {
+            // See https://github.com/Gekkio/imgui-rs
+            imgui::Window::new(imgui::im_str!("Hello world"))
+                .size([300.0, 100.0], imgui::Condition::FirstUseEver)
+                .build(&ui, || {
+                    ui.text(imgui::im_str!("Hello world!"));
+                    ui.text(imgui::im_str!("こんにちは世界！"));
+                    ui.text(imgui::im_str!("This...is...imgui-rs!"));
+                    ui.separator();
+                    let mouse_pos = ui.io().mouse_pos;
+                    ui.text(format!(
+                        "Mouse Position: ({:.1},{:.1})",
+                        mouse_pos[0], mouse_pos[1]
+                    ));
+                });
+        });
 
-        engine
-            .systems_borrow()
-            .imgui_mut()
-            .expect("Imgui sys not init.")
-            .add_render_fn(|ui| {
-                // See https://github.com/Gekkio/imgui-rs
-                imgui::Window::new(imgui::im_str!("Hello world"))
-                    .size([300.0, 100.0], imgui::Condition::FirstUseEver)
-                    .build(&ui, || {
-                        ui.text(imgui::im_str!("Hello world!"));
-                        ui.text(imgui::im_str!("こんにちは世界！"));
-                        ui.text(imgui::im_str!("This...is...imgui-rs!"));
-                        ui.separator();
-                        let mouse_pos = ui.io().mouse_pos;
-                        ui.text(format!(
-                            "Mouse Position: ({:.1},{:.1})",
-                            mouse_pos[0], mouse_pos[1]
-                        ));
-                    });
-            });
+        mat_engine::imgui::render(ctx);
 
-        engine
-            .systems_borrow()
-            .imgui_mut()
-            .expect("Imgui sys not init.")
-            .render();
-
-        engine
-            .systems_borrow()
-            .rendering_mut()
-            .expect("Rendering sys not init.")
-            .complete_render();
+        mat_engine::rendering::complete_render(ctx);
     }
 
     fn event_postprocessor(
         &mut self,
-        engine: &mut mat_engine::systems::Engine,
+        ctx: &mut mat_engine::context::EngineContext,
         event: &winit::event::Event<mat_engine::windowing::Request>,
     ) {
-        engine
-            .systems_borrow()
-            .imgui_mut()
-            .expect("Imgui sys not init.")
-            .process_event(event);
+        mat_engine::imgui::process_event(ctx, event);
     }
 }
 

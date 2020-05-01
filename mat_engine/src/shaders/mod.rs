@@ -61,6 +61,7 @@ pub(crate) unsafe fn compile_glsl_to_spirv<S: AsRef<str>>(
 }
 
 /// Debugging utility function
+#[allow(dead_code)]
 pub(crate) fn compile_glsl_to_spirv_asm<S: AsRef<str>>(
     source: S,
     file_name: S,
@@ -138,6 +139,7 @@ pub struct Shader {
 }
 
 impl Shader {
+    #[allow(dead_code)]
     pub(crate) fn shader_type(&self) -> ShaderType {
         self.shader_type
     }

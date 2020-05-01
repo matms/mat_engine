@@ -1,6 +1,14 @@
 // See https://sotrh.github.io/learn-wgpu/
 
-use std::{cell::RefCell, rc::Rc};
+use crate::utils::unwrap_mut;
+
+pub fn start_render(ctx: &mut crate::EngineContext) {
+    unwrap_mut(&mut ctx.rendering_context).start_render();
+}
+
+pub fn complete_render(ctx: &mut crate::EngineContext) {
+    unwrap_mut(&mut ctx.rendering_context).complete_render();
+}
 
 enum FrtHolder {
     Owned(FrameRenderTarget),
@@ -10,41 +18,24 @@ enum FrtHolder {
 
 #[allow(dead_code, unused_variables)]
 pub struct RenderingSystem {
-    pub(crate) systems: Rc<RefCell<crate::systems::Systems>>,
     pub(crate) state: WgpuState,
     frt: FrtHolder,
 }
 
 impl RenderingSystem {
     /// Creates new Rendering System.
-    ///
-    /// Needs mutable borrow of the windowing system because it adds itself as a listener
-    /// to certain window events (specifically, for now, it listens to resizes).
-    pub(crate) fn new(engine: &crate::systems::Engine) -> Self {
-        // We take in `Engine` instead of `Rc<RefCell<Systems>>` bc the systems_rc() method is
-        // pub(crate), and we don't want to have to expose it. However, to reduce coupling,
-        // the only access to engine should be this line. If it is the case that this function is
-        // also pub(crate) (i.e. the system is created automatically, by the engine) then the
-        // above reason doesn't apply: Instead, we take in Engine for consistency with systems
-        // for which the above is the case.
-        let systems = engine.systems_rc();
-
-        let systems_ref = systems.borrow();
-        let windowing_system = systems_ref
-            .windowing()
-            .expect("Failed to Borrow the Windowing System. Note that you must create the Windowing System BEFORE the Rendering System");
+    pub(crate) fn new(windowing_context: &crate::windowing::WindowingSystem) -> Self {
         Self {
-            systems: systems.clone(),
             state: WgpuState::new(
-                windowing_system.get_window_ref(),
-                windowing_system.get_window_ref().inner_size().width,
-                windowing_system.get_window_ref().inner_size().height,
+                windowing_context.get_window_ref(),
+                windowing_context.get_window_ref().inner_size().width,
+                windowing_context.get_window_ref().inner_size().height,
             ),
             frt: FrtHolder::None,
         }
     }
 
-    pub fn start_render(&mut self) {
+    pub(crate) fn start_render(&mut self) {
         let mut frt = self.state.start_frame_render();
 
         // We use a scope here bc we need to borrow frt mutably.
@@ -57,7 +48,8 @@ impl RenderingSystem {
         self.frt = FrtHolder::Owned(frt);
     }
 
-    pub fn take_frt(&mut self) -> FrameRenderTarget {
+    /// DEPRECATED, maybe???
+    pub(crate) fn take_frt(&mut self) -> FrameRenderTarget {
         match self.frt {
             FrtHolder::Owned(_) => {
                 let x = std::mem::replace(&mut self.frt, FrtHolder::Given);
@@ -82,7 +74,7 @@ impl RenderingSystem {
         }
     }
 
-    pub fn complete_render(&mut self) {
+    pub(crate) fn complete_render(&mut self) {
         match self.frt {
             FrtHolder::Owned(_) => {
                 let x = std::mem::replace(&mut self.frt, FrtHolder::None);
