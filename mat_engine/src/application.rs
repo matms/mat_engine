@@ -33,13 +33,4 @@ pub trait Application {
     /// Called once per frame, after `Application::update()`
     #[allow(unused_variables)]
     fn render(&mut self, ctx: &mut crate::context::EngineContext) {}
-
-    /// TEMPORARY -> TODO REFACTOR:
-    #[allow(unused_variables)]
-    fn event_postprocessor(
-        &mut self,
-        ctx: &mut crate::context::EngineContext,
-        event: &winit::event::Event<crate::windowing::Request>,
-    ) {
-    }
 }

@@ -2,24 +2,17 @@
 
 use crate::utils::unwrap_mut;
 
-pub fn start_render(ctx: &mut crate::EngineContext) {
-    unwrap_mut(&mut ctx.rendering_context).start_render();
+pub fn start_render(ctx: &mut crate::EngineContext) -> FrameRenderTarget {
+    unwrap_mut(&mut ctx.rendering_context).start_render()
 }
 
-pub fn complete_render(ctx: &mut crate::EngineContext) {
-    unwrap_mut(&mut ctx.rendering_context).complete_render();
-}
-
-enum FrtHolder {
-    Owned(FrameRenderTarget),
-    Given, // Someone called take_frt() but didn't yet return_frt()
-    None,
+pub fn complete_render(ctx: &mut crate::EngineContext, frt: FrameRenderTarget) {
+    unwrap_mut(&mut ctx.rendering_context).complete_render(frt);
 }
 
 #[allow(dead_code, unused_variables)]
 pub struct RenderingSystem {
     pub(crate) state: WgpuState,
-    frt: FrtHolder,
 }
 
 impl RenderingSystem {
@@ -31,11 +24,10 @@ impl RenderingSystem {
                 windowing_context.get_window_ref().inner_size().width,
                 windowing_context.get_window_ref().inner_size().height,
             ),
-            frt: FrtHolder::None,
         }
     }
 
-    pub(crate) fn start_render(&mut self) {
+    pub(crate) fn start_render(&mut self) -> FrameRenderTarget {
         let mut frt = self.state.start_frame_render();
 
         // We use a scope here bc we need to borrow frt mutably.
@@ -45,59 +37,11 @@ impl RenderingSystem {
             render_pass.wgpu_render_pass().draw(0..3, 0..1);
         }
 
-        self.frt = FrtHolder::Owned(frt);
+        frt
     }
 
-    /// DEPRECATED, maybe???
-    pub(crate) fn take_frt(&mut self) -> FrameRenderTarget {
-        match self.frt {
-            FrtHolder::Owned(_) => {
-                let x = std::mem::replace(&mut self.frt, FrtHolder::Given);
-                if let FrtHolder::Owned(y) = x {
-                    y
-                } else {
-                    unreachable!()
-                }
-            }
-            FrtHolder::Given => {
-                log::error!(
-                    "Frame render target was taken from Rendering system but not given back yet."
-                );
-                panic!(
-                    "Frame render target was taken from Rendering system but not given back yet."
-                );
-            }
-            FrtHolder::None => {
-                log::error!("No frame render target.");
-                panic!("No frame render target.");
-            }
-        }
-    }
-
-    pub(crate) fn complete_render(&mut self) {
-        match self.frt {
-            FrtHolder::Owned(_) => {
-                let x = std::mem::replace(&mut self.frt, FrtHolder::None);
-
-                if let FrtHolder::Owned(y) = x {
-                    self.state.complete_frame_render(y);
-                } else {
-                    unreachable!();
-                }
-            }
-            FrtHolder::Given => {
-                log::error!(
-                    "Frame render target was taken from Rendering system but not given back yet."
-                );
-                panic!(
-                    "Frame render target was taken from Rendering system but not given back yet."
-                );
-            }
-            FrtHolder::None => {
-                log::error!("No frame render target.");
-                panic!("No frame render target.");
-            }
-        };
+    pub(crate) fn complete_render(&mut self, frt: FrameRenderTarget) {
+        self.state.complete_frame_render(frt);
     }
 
     #[cfg(not(feature = "glsl-to-spirv"))]
@@ -126,28 +70,6 @@ impl RenderingSystem {
             self.state.swap_chain_descriptor.format,
             None,
         )
-    }
-
-    /// Use to get mutable borrows of both state and frt. Needed bc. borrowck cannot properly
-    /// resolve the splitting borrow from other places.
-    pub(crate) fn state_and_frt(&mut self) -> (&mut WgpuState, &mut FrameRenderTarget) {
-        match &mut self.frt {
-            FrtHolder::Owned(x) => {
-                return (&mut self.state, x);
-            }
-            FrtHolder::Given => {
-                log::error!(
-                    "Frame render target was taken from Rendering system but not given back yet."
-                );
-                panic!(
-                    "Frame render target was taken from Rendering system but not given back yet."
-                );
-            }
-            FrtHolder::None => {
-                log::error!("No frame render target.");
-                panic!("No frame render target.");
-            }
-        };
     }
 }
 
@@ -313,17 +235,13 @@ impl WgpuState {
     fn start_frame_render(&mut self) -> FrameRenderTarget {
         let frame = self.swap_chain.get_next_texture().unwrap();
 
-        let command_encoder_descriptor = &wgpu::CommandEncoderDescriptor {
-            label: Some("wgpu renderer encoder"),
-        };
-
         let encoder = self
             .device
-            .create_command_encoder(command_encoder_descriptor);
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("wgpu renderer encoder"),
+            });
 
-        let frt = FrameRenderTarget { frame, encoder };
-
-        frt
+        FrameRenderTarget { frame, encoder }
     }
 
     fn complete_frame_render(&mut self, frt: FrameRenderTarget) {
@@ -366,6 +284,8 @@ impl<'a> RenderPass<'a> {
     }
 }
 
+/// Represents the resources necessary to render to screen which were created by
+/// `rendering::start_render()`, used as needed, and given back in `rendering::complete_render()`
 pub struct FrameRenderTarget {
     pub(crate) frame: wgpu::SwapChainOutput,
     pub(crate) encoder: wgpu::CommandEncoder,

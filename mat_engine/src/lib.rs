@@ -115,7 +115,21 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                 }
             }
 
-            app.event_postprocessor(&mut ctx, &event);
+            process_event(&mut ctx, &event);
         }
     })
+}
+
+/// Event post-processor: Code that should be run for every* event should go here
+/// * (except for `winit::event::Event::LoopDestroyed`)
+fn process_event(
+    ctx: &mut context::EngineContext,
+    event: &winit::event::Event<crate::windowing::Request>,
+) {
+    match &ctx.imgui_context {
+        None => {}
+        Some(_) => {
+            imgui::process_event(ctx, event);
+        }
+    }
 }

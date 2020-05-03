@@ -12,10 +12,11 @@ where
     unwrap_mut(&mut ctx.imgui_context).add_render_fn(func);
 }
 
-pub fn render(ctx: &mut crate::EngineContext) {
+pub fn render(ctx: &mut crate::EngineContext, frt: &mut crate::rendering::FrameRenderTarget) {
     unwrap_mut(&mut ctx.imgui_context).render(
         unwrap_ref(&ctx.windowing_context),
         unwrap_mut(&mut ctx.rendering_context),
+        frt,
     );
 }
 
@@ -92,6 +93,7 @@ impl ImguiSystem {
         &mut self,
         windowing_context: &crate::windowing::WindowingSystem,
         rendering_context: &mut crate::rendering::RenderingSystem,
+        frt: &mut crate::rendering::FrameRenderTarget,
     ) {
         let mut ui = self.imgui_ctx.frame();
 
@@ -105,14 +107,11 @@ impl ImguiSystem {
         let draw_data = ui.render();
 
         {
-            // Split borrow -> state_and_frt is needed bc. borrowck is stupid.
-            let (rs_state, frt) = rendering_context.state_and_frt();
-
             let encoder = &mut frt.encoder;
 
             let view = &frt.frame.view;
 
-            let device = &rs_state.device;
+            let device = &rendering_context.state.device;
 
             self.renderer
                 .render(draw_data, device, encoder, view)
