@@ -90,7 +90,7 @@ impl Testing for B {
 }
 
 fn random_testing() {
-    let mut a = mat_engine::slotmap::Arena::<Box<dyn Testing>>::new();
+    let mut a = mat_engine::arena::Arena::<Box<dyn Testing>>::new();
     let foo = a.insert(Box::new(A {}));
     let bar = a.insert(Box::new(B {}));
     *a.get_mut(foo).unwrap() = Box::new(B {});

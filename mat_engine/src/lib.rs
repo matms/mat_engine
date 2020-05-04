@@ -3,10 +3,10 @@ mod macros;
 mod utils;
 
 pub mod application;
+pub mod arena;
 pub mod context;
 pub mod imgui;
 pub mod rendering;
-pub mod slotmap;
 pub mod windowing;
 
 pub use context::EngineContext;
