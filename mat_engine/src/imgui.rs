@@ -1,7 +1,10 @@
-use crate::utils::{unwrap_mut, unwrap_ref};
+use crate::{
+    rendering::imgui_rend::ImguiRenderingSubsystem,
+    utils::{unwrap_mut, unwrap_ref},
+};
 
 pub fn update(ctx: &mut crate::EngineContext) {
-    unwrap_mut(&mut ctx.imgui_context).update(unwrap_ref(&mut ctx.windowing_context));
+    unwrap_mut(&mut ctx.imgui_system).update(unwrap_ref(&mut ctx.windowing_system));
 }
 
 pub fn add_render_fn<F>(ctx: &mut crate::EngineContext, func: F)
@@ -9,22 +12,22 @@ where
     F: 'static,
     F: FnMut(&mut ::imgui::Ui),
 {
-    unwrap_mut(&mut ctx.imgui_context).add_render_fn(func);
+    unwrap_mut(&mut ctx.imgui_system).add_render_fn(func);
 }
 
 pub fn render(ctx: &mut crate::EngineContext, frt: &mut crate::rendering::FrameRenderTarget) {
-    unwrap_mut(&mut ctx.imgui_context).render(
-        unwrap_ref(&ctx.windowing_context),
-        unwrap_mut(&mut ctx.rendering_context),
+    unwrap_mut(&mut ctx.imgui_system).render(
+        unwrap_ref(&ctx.windowing_system),
+        unwrap_mut(&mut ctx.rendering_system),
         frt,
     );
 }
 
-pub fn process_event(
+pub(crate) fn process_event(
     ctx: &mut crate::EngineContext,
     event: &winit::event::Event<crate::windowing::Request>,
 ) {
-    unwrap_mut(&mut ctx.imgui_context).process_event(unwrap_ref(&ctx.windowing_context), event);
+    unwrap_mut(&mut ctx.imgui_system).process_event(unwrap_ref(&ctx.windowing_system), event);
 }
 
 /// ImguiSystem is not a core system, and is not automatically initialized. The user
@@ -32,16 +35,16 @@ pub fn process_event(
 pub struct ImguiSystem {
     imgui_ctx: ::imgui::Context,
     imgui_winit_platform: imgui_winit_support::WinitPlatform,
-    renderer: imgui_wgpu::Renderer,
+    rendering_subsystem: ImguiRenderingSubsystem,
     render_fns: Vec<Box<dyn FnMut(&mut ::imgui::Ui)>>,
 }
 
 impl ImguiSystem {
     pub(crate) fn new(
-        windowing_context: &crate::windowing::WindowingSystem,
-        rendering_context: &mut crate::rendering::RenderingSystem,
+        windowing_system: &crate::windowing::WindowingSystem,
+        rendering_system: &mut crate::rendering::RenderingSystem,
     ) -> Self {
-        let winit_window = windowing_context.get_window_ref();
+        let winit_window = windowing_system.get_window_ref();
 
         // see https://docs.rs/imgui-winit-support/0.3.1/imgui_winit_support/
         let mut imgui_ctx = ::imgui::Context::create();
@@ -61,20 +64,18 @@ impl ImguiSystem {
                 }),
             }]);
 
-        let renderer = rendering_context.make_imgui_wgpu_renderer(&mut imgui_ctx);
+        let rendering_subsystem = ImguiRenderingSubsystem::new(rendering_system, &mut imgui_ctx);
 
         Self {
             imgui_ctx,
             imgui_winit_platform,
-            renderer,
+            rendering_subsystem,
             render_fns: vec![],
         }
     }
 
-    pub(crate) fn update(&mut self, windowing_context: &crate::windowing::WindowingSystem) {
-        let winit_window = windowing_context.get_window_ref();
-
-        self.render_fns.clear();
+    pub(crate) fn update(&mut self, windowing_system: &crate::windowing::WindowingSystem) {
+        let winit_window = windowing_system.get_window_ref();
 
         self.imgui_winit_platform
             .prepare_frame(self.imgui_ctx.io_mut(), winit_window)
@@ -91,8 +92,8 @@ impl ImguiSystem {
 
     pub(crate) fn render(
         &mut self,
-        windowing_context: &crate::windowing::WindowingSystem,
-        rendering_context: &mut crate::rendering::RenderingSystem,
+        windowing_system: &crate::windowing::WindowingSystem,
+        rendering_system: &mut crate::rendering::RenderingSystem,
         frt: &mut crate::rendering::FrameRenderTarget,
     ) {
         let mut ui = self.imgui_ctx.frame();
@@ -102,31 +103,24 @@ impl ImguiSystem {
         }
 
         self.imgui_winit_platform
-            .prepare_render(&ui, windowing_context.get_window_ref());
+            .prepare_render(&ui, windowing_system.get_window_ref());
 
         let draw_data = ui.render();
 
-        {
-            let encoder = &mut frt.encoder;
+        self.rendering_subsystem
+            .perform_render(draw_data, rendering_system, frt);
 
-            let view = &frt.frame.view;
-
-            let device = &rendering_context.state.device;
-
-            self.renderer
-                .render(draw_data, device, encoder, view)
-                .expect("Imgui rendering failed");
-        }
+        self.render_fns.clear();
     }
 
     pub(crate) fn process_event(
         &mut self,
-        windowing_context: &crate::windowing::WindowingSystem,
+        windowing_system: &crate::windowing::WindowingSystem,
         event: &winit::event::Event<crate::windowing::Request>,
     ) {
         self.imgui_winit_platform.handle_event(
             self.imgui_ctx.io_mut(),
-            windowing_context.get_window_ref(),
+            windowing_system.get_window_ref(),
             event,
         )
     }

@@ -6,7 +6,6 @@ pub mod application;
 pub mod context;
 pub mod imgui;
 pub mod rendering;
-pub mod shaders;
 pub mod slotmap;
 pub mod windowing;
 
@@ -19,26 +18,18 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
 
     let mut ctx = context::EngineContext::uninit();
 
-    let winit_event_loop = winit::event_loop::EventLoop::<windowing::Request>::with_user_event();
-    let winit_event_loop_proxy = winit_event_loop.create_proxy();
-    let winit_window = winit::window::WindowBuilder::new()
-        .build(&winit_event_loop)
-        .expect("Could not obtain winit window");
+    let ev_loop = windowing::make_winit_event_loop();
 
-    ctx.windowing_context = Some(windowing::WindowingSystem::new(
-        winit_window,
-        winit_event_loop_proxy,
-    ));
+    ctx.windowing_init(
+        windowing::make_default_winit_window(&ev_loop),
+        windowing::make_winit_event_loop_proxy(&ev_loop),
+    );
 
-    ctx.rendering_context = Some(rendering::RenderingSystem::new(
-        &ctx.windowing_context
-            .as_mut()
-            .expect("Need windowing context to make rendering context"),
-    ));
+    ctx.rendering_init();
 
     app.init(&mut ctx);
 
-    winit_event_loop.run(move |event, _, control_flow| {
+    ev_loop.run(move |event, _, control_flow| {
         // Immediately start the next loop once current is done, instead of waiting
         // for user input.
         // TODO: This may be useful for frame-rate limiting, I'm unsure. Need to examine.
@@ -51,7 +42,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
         // Even when we set *control_flow to Exit, winit still wants to go through the
         // outstanding events. If we wish to skip this, we can use force_quit to ignore
         // all the events until the quitting actually occurs.
-        } else if ctx.windowing_context.as_mut().unwrap().force_quit {
+        } else if ctx.windowing_system.as_mut().unwrap().force_quit {
             log::trace!("Force quitting... ignoring outsanding event");
             *control_flow = winit::event_loop::ControlFlow::Exit;
         } else {
@@ -94,7 +85,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                     app.update(&mut ctx);
 
                     {
-                        ctx.windowing_context
+                        ctx.windowing_system
                             .as_mut()
                             .unwrap()
                             .winit_window
@@ -126,7 +117,7 @@ fn process_event(
     ctx: &mut context::EngineContext,
     event: &winit::event::Event<crate::windowing::Request>,
 ) {
-    match &ctx.imgui_context {
+    match &ctx.imgui_system {
         None => {}
         Some(_) => {
             imgui::process_event(ctx, event);

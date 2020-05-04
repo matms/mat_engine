@@ -1,102 +1,23 @@
-// See https://sotrh.github.io/learn-wgpu/
-
-use crate::utils::unwrap_mut;
-
-pub fn start_render(ctx: &mut crate::EngineContext) -> FrameRenderTarget {
-    unwrap_mut(&mut ctx.rendering_context).start_render()
-}
-
-pub fn complete_render(ctx: &mut crate::EngineContext, frt: FrameRenderTarget) {
-    unwrap_mut(&mut ctx.rendering_context).complete_render(frt);
-}
-
-#[allow(dead_code, unused_variables)]
-pub struct RenderingSystem {
-    pub(crate) state: WgpuState,
-}
-
-impl RenderingSystem {
-    /// Creates new Rendering System.
-    pub(crate) fn new(windowing_context: &crate::windowing::WindowingSystem) -> Self {
-        Self {
-            state: WgpuState::new(
-                windowing_context.get_window_ref(),
-                windowing_context.get_window_ref().inner_size().width,
-                windowing_context.get_window_ref().inner_size().height,
-            ),
-        }
-    }
-
-    pub(crate) fn start_render(&mut self) -> FrameRenderTarget {
-        let mut frt = self.state.start_frame_render();
-
-        // We use a scope here bc we need to borrow frt mutably.
-        {
-            let mut render_pass = self.state.make_render_pass(&mut frt);
-
-            render_pass.wgpu_render_pass().draw(0..3, 0..1);
-        }
-
-        frt
-    }
-
-    pub(crate) fn complete_render(&mut self, frt: FrameRenderTarget) {
-        self.state.complete_frame_render(frt);
-    }
-
-    #[cfg(not(feature = "glsl-to-spirv"))]
-    pub(crate) fn make_imgui_wgpu_renderer(
-        &mut self,
-        imgui_ctx: &mut ::imgui::Context,
-    ) -> imgui_wgpu::Renderer {
-        imgui_wgpu::Renderer::new(
-            imgui_ctx,
-            &self.state.device,
-            &mut self.state.queue,
-            self.state.swap_chain_descriptor.format,
-            None,
-        )
-    }
-
-    #[cfg(feature = "glsl-to-spirv")]
-    pub(crate) fn make_imgui_wgpu_renderer(
-        &mut self,
-        imgui_ctx: &mut ::imgui::Context,
-    ) -> imgui_wgpu::Renderer {
-        imgui_wgpu::Renderer::new_glsl(
-            imgui_ctx,
-            &self.state.device,
-            &mut self.state.queue,
-            self.state.swap_chain_descriptor.format,
-            None,
-        )
-    }
-}
-
-impl crate::windowing::ResizeListener for RenderingSystem {
-    fn resize_event(&mut self, new_inner_width: u32, new_inner_height: u32) {
-        self.state.resize(new_inner_width, new_inner_height);
-    }
-}
+use super::frame::FrameRenderTarget;
 
 /// Do not use directly from user code. It is managed by `RenderingSystem`.
 #[allow(dead_code, unused_variables)]
 pub(crate) struct WgpuState {
-    surface: wgpu::Surface,
-    adapter: wgpu::Adapter,
-    pub(crate) device: wgpu::Device,
-    queue: wgpu::Queue,
-    swap_chain_descriptor: wgpu::SwapChainDescriptor,
-    swap_chain: wgpu::SwapChain,
+    pub(super) surface: wgpu::Surface,
+    pub(super) adapter: wgpu::Adapter,
+    pub(super) device: wgpu::Device,
+    pub(super) queue: wgpu::Queue,
+    pub(super) swap_chain_descriptor: wgpu::SwapChainDescriptor,
+    pub(super) swap_chain: wgpu::SwapChain,
 
-    default_render_pipeline: wgpu::RenderPipeline,
+    pub(super) default_render_pipeline: wgpu::RenderPipeline,
 
-    window_inner_width: u32,
-    window_inner_height: u32,
+    pub(super) window_inner_width: u32,
+    pub(super) window_inner_height: u32,
 }
 
 impl WgpuState {
-    fn new(
+    pub(super) fn new(
         // TODO: Abstract -> Remove direct dependency on winit window (see wgpu trait bounds
         // on window)
         window: &winit::window::Window,
@@ -150,12 +71,12 @@ impl WgpuState {
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let vert_shader_data = wgpu::read_spirv(std::io::Cursor::new(
-            crate::shaders::default_vert_shader().as_ref(),
+            crate::rendering::shaders::default_vert_shader().as_ref(),
         ))
         .unwrap();
 
         let frag_shader_data = wgpu::read_spirv(std::io::Cursor::new(
-            crate::shaders::default_frag_shader().as_ref(),
+            crate::rendering::shaders::default_frag_shader().as_ref(),
         ))
         .unwrap();
 
@@ -219,7 +140,7 @@ impl WgpuState {
         }
     }
 
-    fn resize(&mut self, new_inner_width: u32, new_inner_height: u32) {
+    pub(super) fn resize(&mut self, new_inner_width: u32, new_inner_height: u32) {
         log::trace!("Resizing (WgpuState)");
         self.window_inner_width = new_inner_width;
         self.window_inner_height = new_inner_height;
@@ -232,7 +153,7 @@ impl WgpuState {
 
     /// Returns a `FrameRenderTarget`, which will be used for rendering and must be
     /// given back to complete_frame_render().
-    fn start_frame_render(&mut self) -> FrameRenderTarget {
+    pub(super) fn start_frame_render(&mut self) -> FrameRenderTarget {
         let frame = self.swap_chain.get_next_texture().unwrap();
 
         let encoder = self
@@ -244,11 +165,11 @@ impl WgpuState {
         FrameRenderTarget { frame, encoder }
     }
 
-    fn complete_frame_render(&mut self, frt: FrameRenderTarget) {
+    pub(super) fn complete_frame_render(&mut self, frt: FrameRenderTarget) {
         self.queue.submit(&[frt.encoder.finish()])
     }
 
-    fn make_render_pass<'a>(&'a self, frt: &'a mut FrameRenderTarget) -> RenderPass<'a> {
+    pub(super) fn make_render_pass<'a>(&'a self, frt: &'a mut FrameRenderTarget) -> RenderPass<'a> {
         let render_pass_descriptor = &wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: &frt.frame.view,
@@ -274,19 +195,12 @@ impl WgpuState {
     }
 }
 
-pub struct RenderPass<'a> {
+pub(crate) struct RenderPass<'a> {
     wgpu_render_pass: wgpu::RenderPass<'a>,
 }
 
 impl<'a> RenderPass<'a> {
-    fn wgpu_render_pass(&mut self) -> &mut wgpu::RenderPass<'a> {
+    pub(crate) fn wgpu_render_pass(&mut self) -> &mut wgpu::RenderPass<'a> {
         &mut self.wgpu_render_pass
     }
-}
-
-/// Represents the resources necessary to render to screen which were created by
-/// `rendering::start_render()`, used as needed, and given back in `rendering::complete_render()`
-pub struct FrameRenderTarget {
-    pub(crate) frame: wgpu::SwapChainOutput,
-    pub(crate) encoder: wgpu::CommandEncoder,
 }

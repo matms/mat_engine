@@ -1,19 +1,21 @@
+//! Shader handling
+
 lazy_static::lazy_static! {
     static ref COMPILED_DEFAULT_VERT_SHADER: Shader = {
-        unsafe{
-        compile_glsl_to_spirv(
-            include_str!("default_shaders/shader.vert"),
-            "shader.vert",
-            ShaderType::Vertex)
+        unsafe {
+            compile_glsl_to_spirv(
+                include_str!("default_shaders/shader.vert"),
+                "shader.vert",
+                ShaderType::Vertex)
         }
     };
 
     static ref COMPILED_DEFAULT_FRAG_SHADER: Shader = {
-        unsafe{
-        compile_glsl_to_spirv(
-            include_str!("default_shaders/shader.frag"),
-            "shader.frag",
-            ShaderType::Fragment)
+        unsafe {
+            compile_glsl_to_spirv(
+                include_str!("default_shaders/shader.frag"),
+                "shader.frag",
+                ShaderType::Fragment)
         }
     };
 }
@@ -27,6 +29,7 @@ pub(crate) fn default_frag_shader() -> &'static Shader {
 }
 
 /// Safety: Malformed shaders or shaders with incorrect type may be unsafe.
+///
 /// This isn't actually unsafe, what's unsafe is using bad shaders, but since bad shaders come
 /// from here, we mark it as unsafe nonetheless.
 pub(crate) unsafe fn compile_glsl_to_spirv<S: AsRef<str>>(
@@ -39,10 +42,7 @@ pub(crate) unsafe fn compile_glsl_to_spirv<S: AsRef<str>>(
     let mut compiler = shaderc::Compiler::new().unwrap();
     let options = shaderc::CompileOptions::new().unwrap();
 
-    let shader_kind = match shader_type {
-        ShaderType::Vertex => shaderc::ShaderKind::Vertex,
-        ShaderType::Fragment => shaderc::ShaderKind::Fragment,
-    };
+    let shader_kind = shader_type.get_shaderc_shader_kind();
 
     let binary_result = compiler
         .compile_into_spirv(
@@ -72,10 +72,7 @@ pub(crate) fn compile_glsl_to_spirv_asm<S: AsRef<str>>(
     let mut compiler = shaderc::Compiler::new().unwrap();
     let options = shaderc::CompileOptions::new().unwrap();
 
-    let shader_kind = match shader_type {
-        ShaderType::Vertex => shaderc::ShaderKind::Vertex,
-        ShaderType::Fragment => shaderc::ShaderKind::Fragment,
-    };
+    let shader_kind = shader_type.get_shaderc_shader_kind();
 
     let asm_result = compiler
         .compile_into_spirv_assembly(
@@ -127,10 +124,20 @@ fn expected_extension(shader_type: ShaderType) -> &'static str {
     }
 }
 
+/// Represents a type of shader (e.g Vertex, Fragment)
 #[derive(Copy, Clone, Debug)]
 pub enum ShaderType {
     Vertex,
     Fragment,
+}
+
+impl ShaderType {
+    fn get_shaderc_shader_kind(&self) -> shaderc::ShaderKind {
+        match self {
+            ShaderType::Vertex => shaderc::ShaderKind::Vertex,
+            ShaderType::Fragment => shaderc::ShaderKind::Fragment,
+        }
+    }
 }
 
 pub struct Shader {

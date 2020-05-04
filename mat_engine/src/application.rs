@@ -4,7 +4,7 @@
 /// the general control flow, which is done by requesting an Application "object"
 /// (i.e. a struct that impl's Application) and calling it's methods.
 /// Nonetheless, most of the engine is still modular, and the user is
-/// expected to setup and manage all of the engine parts they wish to use.
+/// expected to init most of the engine parts they wish to use.
 ///
 /// CONTROL FLOW:
 ///
@@ -15,16 +15,12 @@
 pub trait Application {
     /// Called once, at initialization.
     #[allow(unused_variables)]
-    fn init(&mut self, ctx: &mut crate::context::EngineContext) {
-        log::trace!("Application initialized. User should probably override Application::init()");
-    }
+    fn init(&mut self, ctx: &mut crate::context::EngineContext) {}
 
     /// Called once the engine wants to close. For e.g. you may save information here.
     /// DO NOT CALL DIRECTLY FROM USER CODE, IT WILL NOT CLOSE THE APP.
     #[allow(unused_variables)]
-    fn close(&mut self, ctx: &mut crate::context::EngineContext) {
-        log::trace!("Application closed");
-    }
+    fn close(&mut self, ctx: &mut crate::context::EngineContext) {}
 
     /// Called once per frame, after handling events but before rendering
     #[allow(unused_variables)]
