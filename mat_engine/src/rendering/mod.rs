@@ -3,7 +3,9 @@
 pub mod frame;
 pub mod shaders;
 
+pub(crate) mod colored_vertex;
 pub(crate) mod imgui_rend;
+pub(crate) mod vertex_trait;
 pub(crate) mod wgpu_state;
 
 use crate::utils::unwrap_mut;
@@ -40,6 +42,26 @@ impl RenderingSystem {
 
         // We use a scope here bc we need to borrow frt mutably.
         {
+            let vertices = &[
+                colored_vertex::ColoredVertex {
+                    position: [0.0, 0.0, 0.0],
+                    color: [1.0, 0.0, 0.0],
+                },
+                colored_vertex::ColoredVertex {
+                    position: [-0.5, -0.5, 0.0],
+                    color: [0.0, 1.0, 0.0],
+                },
+                colored_vertex::ColoredVertex {
+                    position: [0.5, -0.5, 0.0],
+                    color: [0.0, 0.0, 1.0],
+                },
+            ];
+
+            let vertex_buffer = self
+                .state
+                .device
+                .create_buffer_with_data(bytemuck::cast_slice(vertices), wgpu::BufferUsage::VERTEX);
+
             let mut render_pass = self.state.make_render_pass(&mut frt);
 
             // Set default pipeline
@@ -47,7 +69,13 @@ impl RenderingSystem {
                 .set_render_pass_pipeline(&mut render_pass, self.state.default_render_pipeline_key)
                 .expect("Failed to set default pipeline, maybe it doesn't exist");
 
-            render_pass.wgpu_render_pass().draw(0..3, 0..1);
+            render_pass
+                .wgpu_render_pass()
+                .set_vertex_buffer(0, &vertex_buffer, 0, 0);
+
+            render_pass
+                .wgpu_render_pass()
+                .draw(0..(vertices.len() as u32), 0..1);
         }
 
         frt

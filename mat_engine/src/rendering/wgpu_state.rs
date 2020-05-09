@@ -1,4 +1,4 @@
-use super::frame::FrameRenderTarget;
+use super::{frame::FrameRenderTarget, vertex_trait::Vertex};
 use crate::arena::{Arena, ArenaKey};
 
 /// Do not use directly from user code. It is managed by `RenderingSystem`.
@@ -216,7 +216,10 @@ impl WgpuState {
                 depth_stencil_state: None,
                 vertex_state: wgpu::VertexStateDescriptor {
                     index_format: wgpu::IndexFormat::Uint16,
-                    vertex_buffers: &[],
+                    vertex_buffers: &[
+                        // Todo: Allow dynamically changing this
+                        crate::rendering::colored_vertex::ColoredVertex::buffer_descriptor(),
+                    ],
                 },
                 sample_count: 1,
                 sample_mask: !0, // All of them
