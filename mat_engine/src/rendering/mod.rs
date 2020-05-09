@@ -42,6 +42,11 @@ impl RenderingSystem {
         {
             let mut render_pass = self.state.make_render_pass(&mut frt);
 
+            // Set default pipeline
+            self.state
+                .set_render_pass_pipeline(&mut render_pass, self.state.default_render_pipeline_key)
+                .expect("Failed to set default pipeline, maybe it doesn't exist");
+
             render_pass.wgpu_render_pass().draw(0..3, 0..1);
         }
 

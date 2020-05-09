@@ -144,17 +144,25 @@ impl WgpuState {
             }],
             depth_stencil_attachment: None,
         };
-        let mut render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
-
-        render_pass.set_pipeline(
-            &self
-                .render_pipelines
-                .get_unwrap(self.default_render_pipeline_key),
-        );
+        let render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
 
         RenderPass {
             wgpu_render_pass: render_pass,
         }
+    }
+
+    pub(super) fn set_render_pass_pipeline<'a>(
+        &'a self,
+        render_pass: &mut RenderPass<'a>,
+        pipeline_key: ArenaKey,
+    ) -> Result<(), crate::typedefs::BoxErr> {
+        render_pass.wgpu_render_pass().set_pipeline(
+            self.render_pipelines
+                .get(pipeline_key)
+                .ok_or("Pipeline doesn't exist")?,
+        );
+
+        Ok(())
     }
 
     pub(super) fn add_new_render_pipeline(
