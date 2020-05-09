@@ -1,4 +1,5 @@
 use super::frame::FrameRenderTarget;
+use crate::arena::{Arena, ArenaKey};
 
 /// Do not use directly from user code. It is managed by `RenderingSystem`.
 #[allow(dead_code, unused_variables)]
@@ -10,8 +11,10 @@ pub(crate) struct WgpuState {
     pub(super) swap_chain_descriptor: wgpu::SwapChainDescriptor,
     pub(super) swap_chain: wgpu::SwapChain,
 
-    pub(super) default_render_pipeline: wgpu::RenderPipeline,
+    pub(super) render_pipelines: Arena<wgpu::RenderPipeline>,
+    pub(super) default_render_pipeline_key: ArenaKey,
 
+    /*pub(super) default_render_pipeline: wgpu::RenderPipeline,*/
     pub(super) window_inner_width: u32,
     pub(super) window_inner_height: u32,
 }
@@ -70,64 +73,12 @@ impl WgpuState {
 
         let swap_chain = device.create_swap_chain(&surface, &swap_chain_descriptor);
 
-        let vert_shader_data = wgpu::read_spirv(std::io::Cursor::new(
-            crate::rendering::shaders::default_vert_shader().as_ref(),
-        ))
-        .unwrap();
+        let render_pipelines = Arena::new();
 
-        let frag_shader_data = wgpu::read_spirv(std::io::Cursor::new(
-            crate::rendering::shaders::default_frag_shader().as_ref(),
-        ))
-        .unwrap();
+        // Uninitialized -> Initialized with add_new_render_pipeline;
+        let default_render_pipeline_key = ArenaKey::default();
 
-        // TODO: Allow dynamically confinguring shaders.
-
-        let vert_shader_module = device.create_shader_module(&vert_shader_data);
-        let frag_shader_module = device.create_shader_module(&frag_shader_data);
-
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                bind_group_layouts: &[],
-            });
-
-        // https://sotrh.github.io/learn-wgpu/
-        // TODO: Allow dynamically creating new pipelines and swapping pipelines
-        let default_render_pipeline =
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                layout: &render_pipeline_layout,
-                vertex_stage: wgpu::ProgrammableStageDescriptor {
-                    module: &vert_shader_module,
-                    entry_point: "main",
-                },
-                fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                    module: &frag_shader_module,
-                    entry_point: "main",
-                }),
-                rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: wgpu::CullMode::Back,
-                    depth_bias: 0,
-                    depth_bias_slope_scale: 0.0,
-                    depth_bias_clamp: 0.0,
-                }),
-                primitive_topology: wgpu::PrimitiveTopology::TriangleList, // TODO: What does this do?
-                color_states: &[wgpu::ColorStateDescriptor {
-                    format: swap_chain_descriptor.format,
-                    alpha_blend: wgpu::BlendDescriptor::REPLACE,
-                    color_blend: wgpu::BlendDescriptor::REPLACE,
-                    write_mask: wgpu::ColorWrite::ALL,
-                }],
-                depth_stencil_state: None,
-                vertex_state: wgpu::VertexStateDescriptor {
-                    index_format: wgpu::IndexFormat::Uint16,
-                    vertex_buffers: &[],
-                },
-                sample_count: 1,
-                sample_mask: !0, // All of them
-                alpha_to_coverage_enabled: false,
-            });
-
-        Self {
+        let mut out = Self {
             surface,
             adapter,
             device,
@@ -136,8 +87,16 @@ impl WgpuState {
             swap_chain,
             window_inner_width,
             window_inner_height,
-            default_render_pipeline,
-        }
+            render_pipelines,
+            default_render_pipeline_key,
+        };
+
+        out.default_render_pipeline_key = out.add_new_render_pipeline(
+            crate::rendering::shaders::default_vert_shader(),
+            crate::rendering::shaders::default_frag_shader(),
+        );
+
+        out
     }
 
     pub(super) fn resize(&mut self, new_inner_width: u32, new_inner_height: u32) {
@@ -187,11 +146,76 @@ impl WgpuState {
         };
         let mut render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
 
-        render_pass.set_pipeline(&self.default_render_pipeline);
+        render_pass.set_pipeline(
+            &self
+                .render_pipelines
+                .get_unwrap(self.default_render_pipeline_key),
+        );
 
         RenderPass {
             wgpu_render_pass: render_pass,
         }
+    }
+
+    pub(super) fn add_new_render_pipeline(
+        &mut self,
+        vert_shader: &crate::rendering::shaders::Shader,
+        frag_shader: &crate::rendering::shaders::Shader,
+    ) -> ArenaKey {
+        let vert_shader_data =
+            wgpu::read_spirv(std::io::Cursor::new(vert_shader.as_ref())).unwrap();
+
+        let frag_shader_data =
+            wgpu::read_spirv(std::io::Cursor::new(frag_shader.as_ref())).unwrap();
+
+        let vert_shader_module = self.device.create_shader_module(&vert_shader_data);
+        let frag_shader_module = self.device.create_shader_module(&frag_shader_data);
+
+        let render_pipeline_layout =
+            self.device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    bind_group_layouts: &[],
+                });
+
+        // https://sotrh.github.io/learn-wgpu/
+        // TODO: Allow dynamically creating new pipelines and swapping pipelines
+        let render_pipeline = self
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                layout: &render_pipeline_layout,
+                vertex_stage: wgpu::ProgrammableStageDescriptor {
+                    module: &vert_shader_module,
+                    entry_point: "main",
+                },
+                fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                    module: &frag_shader_module,
+                    entry_point: "main",
+                }),
+                rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode: wgpu::CullMode::Back,
+                    depth_bias: 0,
+                    depth_bias_slope_scale: 0.0,
+                    depth_bias_clamp: 0.0,
+                }),
+                primitive_topology: wgpu::PrimitiveTopology::TriangleList, // TODO: What does this do?
+                color_states: &[wgpu::ColorStateDescriptor {
+                    format: self.swap_chain_descriptor.format,
+                    alpha_blend: wgpu::BlendDescriptor::REPLACE,
+                    color_blend: wgpu::BlendDescriptor::REPLACE,
+                    write_mask: wgpu::ColorWrite::ALL,
+                }],
+                depth_stencil_state: None,
+                vertex_state: wgpu::VertexStateDescriptor {
+                    index_format: wgpu::IndexFormat::Uint16,
+                    vertex_buffers: &[],
+                },
+                sample_count: 1,
+                sample_mask: !0, // All of them
+                alpha_to_coverage_enabled: false,
+            });
+
+        self.render_pipelines.insert(render_pipeline)
     }
 }
 
