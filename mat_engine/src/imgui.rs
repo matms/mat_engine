@@ -3,6 +3,32 @@ use crate::{
     utils::{unwrap_mut, unwrap_ref},
 };
 
+use std::sync::{Mutex, MutexGuard};
+
+const USE_GLOBAL_DEBUG_RENDER_FNS: bool = true;
+
+lazy_static::lazy_static! {
+    static ref GLOBAL_DEBUG_RENDER_FNS: Mutex<Vec<Box<dyn FnMut(&mut ::imgui::Ui) + Send>>> =
+        Mutex::new(vec![]);
+}
+
+pub fn global_debug_add_render_fn<F>(func: F)
+where
+    F: 'static,
+    F: FnMut(&mut ::imgui::Ui),
+    F: Send,
+{
+    if USE_GLOBAL_DEBUG_RENDER_FNS {
+        GLOBAL_DEBUG_RENDER_FNS.lock().expect(
+            "Failed to lock GLOBAL_DEBUG_RENDER_FNS Mutex. I should probably do something about this",
+        ).push(Box::new(func));
+    } else {
+        log::warn!(
+            "Attempted to add global debug render fn, but USE_GLOBAL_DEBUG_RENDER_FNS is false."
+        );
+    }
+}
+
 pub fn update(ctx: &mut crate::EngineContext) {
     unwrap_mut(&mut ctx.imgui_system).update(unwrap_ref(&mut ctx.windowing_system));
 }
@@ -100,6 +126,18 @@ impl ImguiSystem {
 
         for f in &mut self.render_fns {
             f(&mut ui);
+        }
+
+        if USE_GLOBAL_DEBUG_RENDER_FNS {
+            let mut fs: MutexGuard<Vec<Box<dyn FnMut(&mut ::imgui::Ui) + Send>>>  = GLOBAL_DEBUG_RENDER_FNS.lock().expect(
+                "Failed to lock GLOBAL_DEBUG_RENDER_FNS Mutex. I should probably do something about this"
+            );
+
+            for f in &mut fs.iter_mut() {
+                f(&mut ui);
+            }
+
+            fs.clear();
         }
 
         self.imgui_winit_platform

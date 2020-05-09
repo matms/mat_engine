@@ -44,7 +44,7 @@ impl RenderingSystem {
         {
             let vertices = &[
                 colored_vertex::ColoredVertex {
-                    position: [0.0, 0.0, 0.0],
+                    position: [0.0, 0.5, 0.0],
                     color: [1.0, 0.0, 0.0],
                 },
                 colored_vertex::ColoredVertex {
@@ -56,6 +56,20 @@ impl RenderingSystem {
                     color: [0.0, 0.0, 1.0],
                 },
             ];
+
+            let vertices_clone = vertices.clone();
+            crate::imgui::global_debug_add_render_fn(move |ui| {
+                // See https://github.com/Gekkio/imgui-rs
+                imgui::Window::new(imgui::im_str!("Renderer"))
+                    .size([300.0, 100.0], imgui::Condition::FirstUseEver)
+                    .build(&ui, || {
+                        ui.text(imgui::im_str!("Renderer"));
+                        ui.text_wrapped(&::imgui::ImString::new(format!(
+                            "vertices: {:?}",
+                            vertices_clone
+                        )));
+                    });
+            });
 
             let vertex_buffer = self
                 .state
