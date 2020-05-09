@@ -43,38 +43,43 @@ impl RenderingSystem {
         // We use a scope here bc we need to borrow frt mutably.
         {
             let vertices = &[
-                colored_vertex::ColoredVertex {
-                    position: [0.0, 0.5, 0.0],
-                    color: [1.0, 0.0, 0.0],
-                },
+                // A
                 colored_vertex::ColoredVertex {
                     position: [-0.5, -0.5, 0.0],
-                    color: [0.0, 1.0, 0.0],
+                    color: [1.0, 0.0, 0.0],
                 },
+                // B
                 colored_vertex::ColoredVertex {
                     position: [0.5, -0.5, 0.0],
+                    color: [0.0, 1.0, 0.0],
+                },
+                // C
+                colored_vertex::ColoredVertex {
+                    position: [0.5, 0.5, 0.0],
                     color: [0.0, 0.0, 1.0],
                 },
+                // D
+                colored_vertex::ColoredVertex {
+                    position: [-0.5, 0.5, 0.0],
+                    color: [1.0, 1.0, 1.0],
+                },
             ];
-
-            let vertices_clone = vertices.clone();
-            crate::imgui::global_debug_add_render_fn(move |ui| {
-                // See https://github.com/Gekkio/imgui-rs
-                imgui::Window::new(imgui::im_str!("Renderer"))
-                    .size([300.0, 100.0], imgui::Condition::FirstUseEver)
-                    .build(&ui, || {
-                        ui.text(imgui::im_str!("Renderer"));
-                        ui.text_wrapped(&::imgui::ImString::new(format!(
-                            "vertices: {:?}",
-                            vertices_clone
-                        )));
-                    });
-            });
 
             let vertex_buffer = self
                 .state
                 .device
                 .create_buffer_with_data(bytemuck::cast_slice(vertices), wgpu::BufferUsage::VERTEX);
+
+            // See pipeline settings for whether index should be u16 or u32
+            let indices: &[u16; 6] = &[
+                0, 1, 2, // A B C
+                0, 2, 3, // A C D
+            ];
+
+            let index_buffer = self
+                .state
+                .device
+                .create_buffer_with_data(bytemuck::cast_slice(indices), wgpu::BufferUsage::INDEX);
 
             let mut render_pass = self.state.make_render_pass(&mut frt);
 
@@ -89,7 +94,11 @@ impl RenderingSystem {
 
             render_pass
                 .wgpu_render_pass()
-                .draw(0..(vertices.len() as u32), 0..1);
+                .set_index_buffer(&index_buffer, 0, 0);
+
+            render_pass
+                .wgpu_render_pass()
+                .draw_indexed(0..(indices.len() as u32), 0, 0..1);
         }
 
         frt
