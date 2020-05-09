@@ -12,6 +12,10 @@ lazy_static::lazy_static! {
         Mutex::new(vec![]);
 }
 
+/// The equivalent of `add_render_fn`, except that it uses a
+/// global, thread-shared, queue (you needn't pass in ctx). Should only be used for debugging.
+///
+/// Currently panics if it cannot lock mutex. Maybe we should change this behavior in the future.
 pub fn global_debug_add_render_fn<F>(func: F)
 where
     F: 'static,
@@ -124,10 +128,14 @@ impl ImguiSystem {
     ) {
         let mut ui = self.imgui_ctx.frame();
 
+        // Execute all closures added in the "normal way".
         for f in &mut self.render_fns {
             f(&mut ui);
         }
 
+        self.render_fns.clear();
+
+        // Execute all closures added in the "debug way" (i.e, using a global, thread-shared, queue)
         if USE_GLOBAL_DEBUG_RENDER_FNS {
             let mut fs: MutexGuard<Vec<Box<dyn FnMut(&mut ::imgui::Ui) + Send>>>  = GLOBAL_DEBUG_RENDER_FNS.lock().expect(
                 "Failed to lock GLOBAL_DEBUG_RENDER_FNS Mutex. I should probably do something about this"
@@ -147,8 +155,6 @@ impl ImguiSystem {
 
         self.rendering_subsystem
             .perform_render(draw_data, rendering_system, frt);
-
-        self.render_fns.clear();
     }
 
     pub(crate) fn process_event(
