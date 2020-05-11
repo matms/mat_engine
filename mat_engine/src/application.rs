@@ -17,16 +17,18 @@ pub trait Application {
     #[allow(unused_variables)]
     fn init(&mut self, ctx: &mut crate::context::EngineContext) {}
 
-    /// Called once the engine wants to close. For e.g. you may save information here.
-    /// DO NOT CALL DIRECTLY FROM USER CODE, IT WILL NOT CLOSE THE APP.
+    /// Called once the engine wants to close. For example, you may save information here.
+    ///
+    /// DO NOT CALL DIRECTLY FROM USER CODE, IT WILL NOT CLOSE THE APP. See the `windowing` module
+    /// for info on how to cause the application to close.
     #[allow(unused_variables)]
     fn close(&mut self, ctx: &mut crate::context::EngineContext) {}
 
-    /// Called once per frame, after handling events but before rendering
+    /// Called once per frame, after handling events but before rendering.
     #[allow(unused_variables)]
     fn update(&mut self, ctx: &mut crate::context::EngineContext) {}
 
-    /// Called once per frame, after `Application::update()`
+    /// Called once per frame, after `Application::update()`.
     #[allow(unused_variables)]
     fn render(&mut self, ctx: &mut crate::context::EngineContext) {}
 }

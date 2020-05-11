@@ -1,5 +1,7 @@
 use crate::{imgui::ImguiSystem, rendering::RenderingSystem, windowing::WindowingSystem};
-/// "Global" engine state
+/// "Global" engine state.
+///
+/// Should probably be used like a singleton. Use of multiple `EngineContexts` is unsupported and untested.
 ///
 /// Systems that aren't initialized by default have init fns to allow users to init them.
 ///
@@ -26,6 +28,7 @@ pub struct EngineContext {
 }
 
 impl EngineContext {
+    /// Returns a new, "empty" `EngineContext` with all systems uninitialized.
     pub(crate) fn uninit() -> Self {
         Self {
             windowing_system: None,
@@ -57,6 +60,10 @@ impl EngineContext {
     }
 
     /// Initialize the Imgui System.
+    ///
+    /// Needs to be manually called iff the user wishes to use the imgui system, and is therefore
+    /// exported to users of the crate.
+    ///
     /// Panics if the windowing or rendering systems are uninitialized.
     pub fn imgui_init(&mut self) {
         self.imgui_system = Some(crate::imgui::ImguiSystem::new(

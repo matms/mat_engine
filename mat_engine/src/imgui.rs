@@ -1,3 +1,7 @@
+//! Not to be confused with the imgui crate.
+//!
+//! In this documentation, I'll use `imgui` for this module, and `::imgui` for the external crate.
+
 use crate::{
     rendering::imgui_rend::ImguiRenderingSubsystem,
     utils::{unwrap_mut, unwrap_ref},
@@ -16,6 +20,8 @@ lazy_static::lazy_static! {
 /// global, thread-shared, queue (you needn't pass in ctx). Should only be used for debugging.
 ///
 /// Currently panics if it cannot lock mutex. Maybe we should change this behavior in the future.
+///
+/// This is NOT a wrapper method.
 pub fn global_debug_add_render_fn<F>(func: F)
 where
     F: 'static,
@@ -33,10 +39,22 @@ where
     }
 }
 
+/// Updates the imgui system. Should be called every frame, before `render()`, probably in the update
+/// section of your application loop.
+///
+/// This is a wrapper method.
 pub fn update(ctx: &mut crate::EngineContext) {
     unwrap_mut(&mut ctx.imgui_system).update(unwrap_ref(&mut ctx.windowing_system));
 }
 
+/// Adds a function/closure that takes in `&mut ::imgui::Ui` (from the imgui crate) and calls
+/// methods on it to draw imgui elements to a rendering queue.
+///
+/// The closures in the queue get executed whenever `imgui::render()` (from this crate) is called.
+/// The queue is then cleared (after all, this is an immediate mode GUI system). If you
+/// want to display the same thing every frame, you must call this function every frame.
+///
+/// This is a wrapper method.
 pub fn add_render_fn<F>(ctx: &mut crate::EngineContext, func: F)
 where
     F: 'static,
@@ -45,6 +63,13 @@ where
     unwrap_mut(&mut ctx.imgui_system).add_render_fn(func);
 }
 
+/// Actually render the closures in the queue. See `add_render_fn()` for how to add these closures.
+/// It also clears the queue once it is done.
+///
+/// Note: It also operates on a global, thread shared queue, iff `USE_GLOBAL_DEBUG_RENDER_FNS` is true.
+/// In this case, see `global_debug_add_render_fn()` for info.
+///
+/// This is a wrapper method.
 pub fn render(ctx: &mut crate::EngineContext, frt: &mut crate::rendering::FrameRenderTarget) {
     unwrap_mut(&mut ctx.imgui_system).render(
         unwrap_ref(&ctx.windowing_system),
@@ -53,6 +78,12 @@ pub fn render(ctx: &mut crate::EngineContext, frt: &mut crate::rendering::FrameR
     );
 }
 
+/// Processes winit events. If using the imgui system, should be called in the winit event loop. See
+/// "lib.rs"'s `process_event()`.
+///
+/// Note: This may be removed in the future and replaced by an Event System.
+///
+/// This is a wrapper method.
 pub(crate) fn process_event(
     ctx: &mut crate::EngineContext,
     event: &winit::event::Event<crate::windowing::Request>,
@@ -104,6 +135,7 @@ impl ImguiSystem {
         }
     }
 
+    /// See wrapper method.
     pub(crate) fn update(&mut self, windowing_system: &crate::windowing::WindowingSystem) {
         let winit_window = windowing_system.get_window_ref();
 
@@ -112,6 +144,7 @@ impl ImguiSystem {
             .expect("Imgui System: Failed to prepare frame");
     }
 
+    /// See wrapper method.
     pub(crate) fn add_render_fn<F>(&mut self, func: F)
     where
         F: 'static,
@@ -120,6 +153,7 @@ impl ImguiSystem {
         self.render_fns.push(Box::new(func));
     }
 
+    /// See wrapper method.
     pub(crate) fn render(
         &mut self,
         windowing_system: &crate::windowing::WindowingSystem,
@@ -157,6 +191,7 @@ impl ImguiSystem {
             .perform_render(draw_data, rendering_system, frt);
     }
 
+    /// See wrapper method.
     pub(crate) fn process_event(
         &mut self,
         windowing_system: &crate::windowing::WindowingSystem,
