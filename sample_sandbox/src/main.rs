@@ -4,7 +4,10 @@ struct MyApp {
 
 impl mat_engine::application::Application for MyApp {
     fn init(&mut self, ctx: &mut mat_engine::context::EngineContext) {
+        //log::warn!("APP INIT!");
+
         self.time = std::time::SystemTime::now();
+
         ctx.imgui_init();
     }
 
@@ -20,6 +23,7 @@ impl mat_engine::application::Application for MyApp {
 
         self.time = new_time;
 
+        //log::warn!("RENDER START");
         let mut frt = mat_engine::rendering::start_render(ctx);
 
         //Render imgui
@@ -49,7 +53,11 @@ impl mat_engine::application::Application for MyApp {
 
         mat_engine::imgui::render(ctx, &mut frt);
 
+        //log::warn!("COMPLETE RENDER START");
+
         mat_engine::rendering::complete_render(ctx, frt);
+
+        //log::warn!("DONE RENDERING");
     }
 }
 

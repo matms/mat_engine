@@ -5,6 +5,8 @@ pub mod shaders;
 
 pub(crate) mod colored_vertex;
 pub(crate) mod imgui_rend;
+pub(crate) mod rend_2d;
+pub(crate) mod textured_vertex;
 pub(crate) mod vertex_trait;
 pub(crate) mod wgpu_state;
 
@@ -44,24 +46,24 @@ impl RenderingSystem {
         {
             let vertices = &[
                 // A
-                colored_vertex::ColoredVertex {
+                textured_vertex::TexturedVertex {
                     position: [-0.5, -0.5, 0.0],
-                    color: [1.0, 0.0, 0.0],
+                    tex_coords: [0.0, 1.0],
                 },
                 // B
-                colored_vertex::ColoredVertex {
+                textured_vertex::TexturedVertex {
                     position: [0.5, -0.5, 0.0],
-                    color: [0.0, 1.0, 0.0],
+                    tex_coords: [1.0, 1.0],
                 },
                 // C
-                colored_vertex::ColoredVertex {
+                textured_vertex::TexturedVertex {
                     position: [0.5, 0.5, 0.0],
-                    color: [0.0, 0.0, 1.0],
+                    tex_coords: [1.0, 0.0],
                 },
                 // D
-                colored_vertex::ColoredVertex {
+                textured_vertex::TexturedVertex {
                     position: [-0.5, 0.5, 0.0],
-                    color: [1.0, 1.0, 1.0],
+                    tex_coords: [0.0, 0.0],
                 },
             ];
 
@@ -87,6 +89,16 @@ impl RenderingSystem {
             self.state
                 .set_render_pass_pipeline(&mut render_pass, self.state.default_render_pipeline_key)
                 .expect("Failed to set default pipeline, maybe it doesn't exist");
+
+            render_pass.wgpu_render_pass().set_bind_group(
+                0,
+                &self
+                    .state
+                    .bind_groups
+                    .get(self.state.default_bind_group_key)
+                    .expect("No default bind group, for some reason"),
+                &[],
+            );
 
             render_pass
                 .wgpu_render_pass()
