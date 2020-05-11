@@ -29,43 +29,14 @@ impl WgpuTexture {
         img: image::DynamicImage,
         label: Option<&'static str>,
     ) -> Result<(Self, wgpu::CommandBuffer), BoxErr> {
-        log::trace!(
-            "Image type: {}",
-            match img {
-                image::DynamicImage::ImageLuma8(_) => {
-                    "ImageLuma8"
-                }
-                image::DynamicImage::ImageLumaA8(_) => {
-                    "ImageLumaA8"
-                }
-                image::DynamicImage::ImageRgb8(_) => {
-                    "ImageRgb8"
-                }
-                image::DynamicImage::ImageRgba8(_) => {
-                    "ImageRgba8"
-                }
-                image::DynamicImage::ImageBgr8(_) => {
-                    "ImageBgr8"
-                }
-                image::DynamicImage::ImageBgra8(_) => {
-                    "ImageBgra8"
-                }
-                image::DynamicImage::ImageLuma16(_) => {
-                    "ImageLuma16"
-                }
-                image::DynamicImage::ImageLumaA16(_) => {
-                    "ImageLumaA16"
-                }
-                image::DynamicImage::ImageRgb16(_) => {
-                    "ImageRgb16"
-                }
-                image::DynamicImage::ImageRgba16(_) => {
-                    "ImageRgba16"
-                }
-            }
-        );
+        let rgba_data = img.as_rgba8().ok_or_else(|| {
+            format!(
+                "Failed to get rgba8 data from image. Currently, we only support loading\
+                 ImageRgba8 textures. The image passed in is {}.",
+                image_type_descriptor_str(&img)
+            )
+        })?;
 
-        let rgba_data = img.as_rgba8().ok_or("Failed to get rgba8 from image")?;
         let (width, height) = img.dimensions();
 
         let size = wgpu::Extent3d {
@@ -141,5 +112,20 @@ impl WgpuTexture {
             },
             cmd_buffer,
         ))
+    }
+}
+
+fn image_type_descriptor_str(img: &image::DynamicImage) -> &'static str {
+    match img {
+        image::DynamicImage::ImageLuma8(_) => "ImageLuma8",
+        image::DynamicImage::ImageLumaA8(_) => "ImageLumaA8",
+        image::DynamicImage::ImageRgb8(_) => "ImageRgb8",
+        image::DynamicImage::ImageRgba8(_) => "ImageRgba8",
+        image::DynamicImage::ImageBgr8(_) => "ImageBgr8",
+        image::DynamicImage::ImageBgra8(_) => "ImageBgra8",
+        image::DynamicImage::ImageLuma16(_) => "ImageLuma16",
+        image::DynamicImage::ImageLumaA16(_) => "ImageLumaA16",
+        image::DynamicImage::ImageRgb16(_) => "ImageRgb16",
+        image::DynamicImage::ImageRgba16(_) => "ImageRgba16",
     }
 }
