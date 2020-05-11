@@ -8,6 +8,7 @@ pub(crate) fn default_texture_bytes() -> &'static [u8] {
 }
 
 pub(crate) struct WgpuTexture {
+    #[allow(dead_code)]
     pub(crate) texture: wgpu::Texture,
     pub(crate) texture_view: wgpu::TextureView,
     pub(crate) sampler: wgpu::Sampler,

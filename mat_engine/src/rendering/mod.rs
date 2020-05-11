@@ -90,26 +90,27 @@ impl RenderingSystem {
                 .set_render_pass_pipeline(&mut render_pass, self.state.default_render_pipeline_key)
                 .expect("Failed to set default pipeline, maybe it doesn't exist");
 
-            render_pass.wgpu_render_pass().set_bind_group(
+            render_pass.wgpu_render_pass.set_bind_group(
                 0,
                 &self
                     .state
                     .bind_groups
                     .get(self.state.default_bind_group_key)
-                    .expect("No default bind group, for some reason"),
+                    .expect("No default bind group, for some reason")
+                    .wgpu_bind_group,
                 &[],
             );
 
             render_pass
-                .wgpu_render_pass()
+                .wgpu_render_pass
                 .set_vertex_buffer(0, &vertex_buffer, 0, 0);
 
             render_pass
-                .wgpu_render_pass()
+                .wgpu_render_pass
                 .set_index_buffer(&index_buffer, 0, 0);
 
             render_pass
-                .wgpu_render_pass()
+                .wgpu_render_pass
                 .draw_indexed(0..(indices.len() as u32), 0, 0..1);
         }
 
