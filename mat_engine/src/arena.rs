@@ -7,6 +7,7 @@ pub struct ArenaKey(::slotmap::DefaultKey);
 
 /// Simple wrapper around `::slotmap::DenseSlotMap`
 /// See https://docs.rs/slotmap/0.4.0/slotmap/dense/struct.DenseSlotMap.html
+#[derive(Clone, Debug)]
 pub struct Arena<T> {
     // We use DenseSlotMap (for now) because of limitations regarding valid types for SlotMap
     // See https://docs.rs/slotmap/0.4.0/slotmap/trait.Slottable.html

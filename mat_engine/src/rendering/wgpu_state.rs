@@ -1,4 +1,7 @@
-use super::{frame::FrameRenderTarget, vertex_trait::Vertex};
+use super::{
+    bind_group::BindGroupable, frame::FrameRenderTarget, rend_2d::wgpu_texture::WgpuTexture,
+    vertex_trait::Vertex,
+};
 use crate::arena::{Arena, ArenaKey};
 
 /// Do not use directly from user code. It is managed by `RenderingSystem`.
@@ -15,7 +18,7 @@ pub(crate) struct WgpuState {
     pub(super) window_inner_height: u32,
 
     // --- ARENAS ---
-    pub(super) textures: Arena<crate::rendering::rend_2d::wgpu_texture::WgpuTexture>,
+    pub(super) textures: Arena<WgpuTexture>,
     pub(super) default_texture_key: ArenaKey,
 
     pub(super) bind_groups: Arena<BindGroup>,
@@ -118,32 +121,9 @@ impl WgpuState {
             Some("default_texture"),
         );
 
-        let texture_bind_group_layout =
-            self.device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    // See `BindGroupDescriptor` instantiation for important info on the bindings.
-                    // If you change sth. here, you'll probably have to change it there also, so
-                    // be careful.
-                    bindings: &[
-                        // Copied from https://sotrh.github.io/learn-wgpu/beginner/tutorial5-textures/#the-bindgroup
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 0,
-                            visibility: wgpu::ShaderStage::FRAGMENT,
-                            ty: wgpu::BindingType::SampledTexture {
-                                multisampled: false,
-                                dimension: wgpu::TextureViewDimension::D2,
-                                component_type: wgpu::TextureComponentType::Uint,
-                            },
-                        },
-                        wgpu::BindGroupLayoutEntry {
-                            binding: 1,
-                            visibility: wgpu::ShaderStage::FRAGMENT,
-                            ty: wgpu::BindingType::Sampler { comparison: false },
-                        },
-                        // End copied from
-                    ],
-                    label: Some("default_bind_group_layout"),
-                });
+        let texture_bind_group_layout = self
+            .device
+            .create_bind_group_layout(&WgpuTexture::get_wgpu_bind_group_layout_descriptor());
 
         self.default_bind_group_key = self.add_new_texture_bind_group(
             &texture_bind_group_layout,
@@ -311,12 +291,7 @@ impl WgpuState {
         label: Option<&'static str>,
     ) -> ArenaKey {
         let (texture, cmd_buf) =
-            crate::rendering::rend_2d::wgpu_texture::WgpuTexture::new_from_bytes(
-                &mut self.device,
-                texture_bytes,
-                label,
-            )
-            .unwrap();
+            WgpuTexture::new_from_bytes(&mut self.device, texture_bytes, label).unwrap();
 
         self.queue.submit(&[cmd_buf]);
 
@@ -329,35 +304,11 @@ impl WgpuState {
         texture_key: ArenaKey,
         label: Option<&'static str>,
     ) -> ArenaKey {
-        let wgpu_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: bind_group_layout,
-            // See `BindGroupLayoutDescriptor` instantiation for important info info on the bindings.
-            // If you change sth. here, you'll probably have to change it there also, so
-            // be careful.
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(
-                        &self
-                            .textures
-                            .get(texture_key)
-                            .expect("The texture doesn't exist")
-                            .texture_view,
-                    ),
-                },
-                wgpu::Binding {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(
-                        &self
-                            .textures
-                            .get(texture_key)
-                            .expect("The texture doesn't exist")
-                            .sampler,
-                    ),
-                },
-            ],
-            label,
-        });
+        let wgpu_bind_group = self
+            .textures
+            .get(texture_key)
+            .expect("The texture doesn't exist")
+            .make_wgpu_bind_group(bind_group_layout, &mut self.device);
 
         self.bind_groups.insert(BindGroup {
             wgpu_bind_group,

@@ -115,6 +115,61 @@ impl WgpuTexture {
     }
 }
 
+impl crate::rendering::bind_group::BindGroupable for WgpuTexture {
+    fn get_wgpu_bind_group_layout_descriptor() -> wgpu::BindGroupLayoutDescriptor<'static> {
+        wgpu::BindGroupLayoutDescriptor {
+            // See `BindGroupDescriptor` instantiation for important info on the bindings.
+            // If you change sth. here, you'll probably have to change it there also, so
+            // be careful.
+            bindings: &[
+                // Copied from https://sotrh.github.io/learn-wgpu/beginner/tutorial5-textures/#the-bindgroup
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::SampledTexture {
+                        multisampled: false,
+                        dimension: wgpu::TextureViewDimension::D2,
+                        component_type: wgpu::TextureComponentType::Uint,
+                    },
+                },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStage::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler { comparison: false },
+                },
+                // End copied from
+            ],
+            label: Some("wgpu_texture_bind_group_layout"),
+        }
+    }
+
+    fn make_wgpu_bind_group(
+        &self,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        device: &mut wgpu::Device,
+    ) -> wgpu::BindGroup {
+        let desc = &wgpu::BindGroupDescriptor {
+            layout: bind_group_layout,
+            // See `BindGroupLayoutDescriptor` instantiation for important info info on the bindings.
+            // If you change sth. here, you'll probably have to change it there also, so
+            // be careful.
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&self.texture_view),
+                },
+                wgpu::Binding {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&self.sampler),
+                },
+            ],
+            label: Some("wgpu_texture_bind_group_for_some_specific_texture"),
+        };
+
+        device.create_bind_group(desc)
+    }
+}
+
 fn image_type_descriptor_str(img: &image::DynamicImage) -> &'static str {
     match img {
         image::DynamicImage::ImageLuma8(_) => "ImageLuma8",
