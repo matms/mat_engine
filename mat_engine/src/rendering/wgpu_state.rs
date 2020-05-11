@@ -1,8 +1,11 @@
 use super::{
     bind_group::BindGroupable, frame::FrameRenderTarget, rend_2d::wgpu_texture::WgpuTexture,
-    vertex_trait::Vertex,
+    textured_vertex::TexturedVertex, vertex_trait::Vertex,
 };
-use crate::arena::{Arena, ArenaKey};
+use crate::{
+    arena::{Arena, ArenaKey},
+    typedefs::BoxErr,
+};
 
 /// Do not use directly from user code. It is managed by `RenderingSystem`.
 #[allow(dead_code, unused_variables)]
@@ -131,12 +134,11 @@ impl WgpuState {
             Some("default_bind_group"),
         );
 
-        self.default_render_pipeline_key = self
-            .add_new_render_pipeline::<crate::rendering::textured_vertex::TexturedVertex>(
-                crate::rendering::shaders::default_vert_shader(),
-                crate::rendering::shaders::default_frag_shader(),
-                &[&texture_bind_group_layout],
-            );
+        self.default_render_pipeline_key = self.add_new_render_pipeline::<TexturedVertex>(
+            crate::rendering::shaders::default_vert_shader(),
+            crate::rendering::shaders::default_frag_shader(),
+            &[&texture_bind_group_layout],
+        );
     }
 
     pub(super) fn resize(&mut self, new_inner_width: u32, new_inner_height: u32) {
@@ -189,20 +191,6 @@ impl WgpuState {
         RenderPass {
             wgpu_render_pass: render_pass,
         }
-    }
-
-    pub(super) fn set_render_pass_pipeline<'a>(
-        &'a self,
-        render_pass: &mut RenderPass<'a>,
-        pipeline_key: ArenaKey,
-    ) -> Result<(), crate::typedefs::BoxErr> {
-        render_pass.wgpu_render_pass.set_pipeline(
-            self.render_pipelines
-                .get(pipeline_key)
-                .ok_or("Pipeline doesn't exist")?,
-        );
-
-        Ok(())
     }
 
     pub(super) fn add_new_render_pipeline<T>(
@@ -321,13 +309,44 @@ pub(crate) struct RenderPass<'a> {
     pub(super) wgpu_render_pass: wgpu::RenderPass<'a>,
 }
 
-/*
 impl<'a> RenderPass<'a> {
-    pub(crate) fn wgpu_render_pass(&mut self) -> &mut wgpu::RenderPass<'a> {
-        &mut self.wgpu_render_pass
+    /// Wrapper around `wgpu::RenderPass::set_bind_group()` but using an `ArenaKey`
+    /// to index into the bind group arena located in `WgpuState`.
+    pub(crate) fn set_bind_group(
+        &mut self,
+        index: u32,
+        bind_group_key: ArenaKey,
+        offsets: &[wgpu::DynamicOffset],
+        wgpu_state: &'a WgpuState,
+    ) -> Result<(), BoxErr> {
+        let bind_group = wgpu_state
+            .bind_groups
+            .get(bind_group_key)
+            .ok_or("Bind group doesn't exist")?;
+
+        self.wgpu_render_pass
+            .set_bind_group(index, &bind_group.wgpu_bind_group, offsets);
+
+        Ok(())
+    }
+
+    /// Wrapper around `wgpu::RenderPass::set_pipeline()` but using an `ArenaKey`
+    /// to index into the pipeline arena located in `WgpuState`.
+    pub(super) fn set_pipeline(
+        &mut self,
+        pipeline_key: ArenaKey,
+        wgpu_state: &'a WgpuState,
+    ) -> Result<(), crate::typedefs::BoxErr> {
+        let pipeline = wgpu_state
+            .render_pipelines
+            .get(pipeline_key)
+            .ok_or("Pipeline doesn't exist")?;
+
+        self.wgpu_render_pass.set_pipeline(pipeline);
+
+        Ok(())
     }
 }
-*/
 
 pub(crate) struct BindGroup {
     pub(super) wgpu_bind_group: wgpu::BindGroup,

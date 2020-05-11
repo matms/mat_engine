@@ -54,66 +54,59 @@ impl RenderingSystem {
     fn start_render(&mut self) -> FrameRenderTarget {
         let mut frt = self.state.start_frame_render();
 
-        // We use a scope here bc we need to borrow frt mutably.
         // TODO: We obviously shouldn't render anything here.
         // Instead, we should move this code somewhere else.
+        // START TEMPORARY, TESTING PURPOSES, RENDERING CODE
+        let vertices = &[
+            // A
+            textured_vertex::TexturedVertex {
+                position: [-0.5, -0.5, 0.0],
+                tex_coords: [0.0, 1.0],
+            },
+            // B
+            textured_vertex::TexturedVertex {
+                position: [0.5, -0.5, 0.0],
+                tex_coords: [1.0, 1.0],
+            },
+            // C
+            textured_vertex::TexturedVertex {
+                position: [0.5, 0.5, 0.0],
+                tex_coords: [1.0, 0.0],
+            },
+            // D
+            textured_vertex::TexturedVertex {
+                position: [-0.5, 0.5, 0.0],
+                tex_coords: [0.0, 0.0],
+            },
+        ];
+
+        let vertex_buffer = self
+            .state
+            .device
+            .create_buffer_with_data(bytemuck::cast_slice(vertices), wgpu::BufferUsage::VERTEX);
+
+        // See pipeline settings for whether index should be u16 or u32
+        let indices: &[u16; 6] = &[
+            0, 1, 2, // A B C
+            0, 2, 3, // A C D
+        ];
+
+        let index_buffer = self
+            .state
+            .device
+            .create_buffer_with_data(bytemuck::cast_slice(indices), wgpu::BufferUsage::INDEX);
+
+        // We use a scope here bc we need to borrow frt mutably.
         {
-            let vertices = &[
-                // A
-                textured_vertex::TexturedVertex {
-                    position: [-0.5, -0.5, 0.0],
-                    tex_coords: [0.0, 1.0],
-                },
-                // B
-                textured_vertex::TexturedVertex {
-                    position: [0.5, -0.5, 0.0],
-                    tex_coords: [1.0, 1.0],
-                },
-                // C
-                textured_vertex::TexturedVertex {
-                    position: [0.5, 0.5, 0.0],
-                    tex_coords: [1.0, 0.0],
-                },
-                // D
-                textured_vertex::TexturedVertex {
-                    position: [-0.5, 0.5, 0.0],
-                    tex_coords: [0.0, 0.0],
-                },
-            ];
-
-            let vertex_buffer = self
-                .state
-                .device
-                .create_buffer_with_data(bytemuck::cast_slice(vertices), wgpu::BufferUsage::VERTEX);
-
-            // See pipeline settings for whether index should be u16 or u32
-            let indices: &[u16; 6] = &[
-                0, 1, 2, // A B C
-                0, 2, 3, // A C D
-            ];
-
-            let index_buffer = self
-                .state
-                .device
-                .create_buffer_with_data(bytemuck::cast_slice(indices), wgpu::BufferUsage::INDEX);
-
             let mut render_pass = self.state.make_render_pass(&mut frt);
 
-            // Set default pipeline
-            self.state
-                .set_render_pass_pipeline(&mut render_pass, self.state.default_render_pipeline_key)
-                .expect("Failed to set default pipeline, maybe it doesn't exist");
+            render_pass
+                .set_pipeline(self.state.default_render_pipeline_key, &self.state)
+                .unwrap();
 
-            render_pass.wgpu_render_pass.set_bind_group(
-                0,
-                &self
-                    .state
-                    .bind_groups
-                    .get(self.state.default_bind_group_key)
-                    .expect("No default bind group, for some reason")
-                    .wgpu_bind_group,
-                &[],
-            );
+            render_pass
+                .set_bind_group(0, self.state.default_bind_group_key, &[], &self.state)
+                .unwrap();
 
             render_pass
                 .wgpu_render_pass
@@ -127,6 +120,7 @@ impl RenderingSystem {
                 .wgpu_render_pass
                 .draw_indexed(0..(indices.len() as u32), 0, 0..1);
         }
+        // END TEMPORARY, TESTING PURPOSES, RENDERING CODE
 
         frt
     }
