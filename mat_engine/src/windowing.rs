@@ -32,6 +32,7 @@ pub(crate) fn make_default_winit_window(
     winit_event_loop: &winit::event_loop::EventLoop<Request>,
 ) -> winit::window::Window {
     winit::window::WindowBuilder::new()
+        .with_title("Sample Application")
         .build(&winit_event_loop)
         .expect("Could not obtain winit window")
 }

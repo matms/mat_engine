@@ -1,11 +1,11 @@
+//! This module provides a default 2d renderer.
+
 use super::{
-    bind_group::BindGroupable, textured_vertex::TexturedVertex, wgpu_state::WgpuState,
-    FrameRenderTarget,
+    bind_group::BindGroupable, shaders, textured_vertex::TexturedVertex, wgpu_state::WgpuState,
+    wgpu_texture::WgpuTexture, FrameRenderTarget,
 };
 use crate::arena::ArenaKey;
 use crate::utils::unwrap_mut;
-
-pub mod wgpu_texture;
 
 /// Default 2D renderer.
 ///
@@ -21,13 +21,13 @@ impl Renderer2d {
     pub fn new(ctx: &mut crate::EngineContext) -> Self {
         let wgpu_state = &mut unwrap_mut(&mut ctx.rendering_system).state;
 
-        let desc = wgpu_texture::WgpuTexture::get_wgpu_bind_group_layout_descriptor();
+        let desc = WgpuTexture::get_wgpu_bind_group_layout_descriptor();
 
         let texture_bind_group_layout = wgpu_state.device.create_bind_group_layout(&desc);
 
         let pipeline_key = wgpu_state.add_new_render_pipeline::<TexturedVertex>(
-            crate::rendering::shaders::default_vert_shader(),
-            crate::rendering::shaders::default_frag_shader(),
+            rend_2d_vert_shader(),
+            rend_2d_frag_shader(),
             &[&texture_bind_group_layout],
         );
 
@@ -144,4 +144,34 @@ impl Renderer2d {
             texture_label,
         )
     }
+}
+
+// --- SHADERS ---
+
+lazy_static::lazy_static! {
+    static ref COMPILED_DEFAULT_VERT_SHADER: shaders::Shader = {
+        unsafe {
+            shaders::compile_glsl_to_spirv(
+                include_str!("shader_files/shader.vert"),
+                "shader.vert",
+                shaders::ShaderType::Vertex)
+        }
+    };
+
+    static ref COMPILED_DEFAULT_FRAG_SHADER: shaders::Shader = {
+        unsafe {
+            shaders::compile_glsl_to_spirv(
+                include_str!("shader_files/shader.frag"),
+                "shader.frag",
+                shaders::ShaderType::Fragment)
+        }
+    };
+}
+
+fn rend_2d_vert_shader() -> &'static shaders::Shader {
+    &*COMPILED_DEFAULT_VERT_SHADER
+}
+
+fn rend_2d_frag_shader() -> &'static shaders::Shader {
+    &*COMPILED_DEFAULT_FRAG_SHADER
 }

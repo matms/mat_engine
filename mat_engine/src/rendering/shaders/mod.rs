@@ -1,33 +1,5 @@
 //! Shader handling
 
-lazy_static::lazy_static! {
-    static ref COMPILED_DEFAULT_VERT_SHADER: Shader = {
-        unsafe {
-            compile_glsl_to_spirv(
-                include_str!("default_shaders/shader.vert"),
-                "shader.vert",
-                ShaderType::Vertex)
-        }
-    };
-
-    static ref COMPILED_DEFAULT_FRAG_SHADER: Shader = {
-        unsafe {
-            compile_glsl_to_spirv(
-                include_str!("default_shaders/shader.frag"),
-                "shader.frag",
-                ShaderType::Fragment)
-        }
-    };
-}
-
-pub(crate) fn default_vert_shader() -> &'static Shader {
-    &*COMPILED_DEFAULT_VERT_SHADER
-}
-
-pub(crate) fn default_frag_shader() -> &'static Shader {
-    &*COMPILED_DEFAULT_FRAG_SHADER
-}
-
 /// Safety: Malformed shaders or shaders with incorrect type may be unsafe.
 ///
 /// This isn't actually unsafe, what's unsafe is using bad shaders, but since bad shaders come

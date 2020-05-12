@@ -1,6 +1,6 @@
 use super::{
-    bind_group::BindGroupable, frame::FrameRenderTarget, rend_2d::wgpu_texture::WgpuTexture,
-    vertex_trait::Vertex,
+    bind_group::BindGroupable, frame::FrameRenderTarget, vertex_trait::Vertex,
+    wgpu_texture::WgpuTexture,
 };
 use crate::{
     arena::{Arena, ArenaKey},

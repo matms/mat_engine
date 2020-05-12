@@ -10,6 +10,7 @@ pub(crate) mod imgui_rend;
 pub(crate) mod textured_vertex;
 pub(crate) mod vertex_trait;
 pub(crate) mod wgpu_state;
+pub(crate) mod wgpu_texture;
 
 use crate::utils::unwrap_mut;
 pub use frame::FrameRenderTarget;
