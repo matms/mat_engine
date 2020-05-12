@@ -4,8 +4,12 @@ use super::{
     bind_group::BindGroupable, shaders, textured_vertex::TexturedVertex, wgpu_state::WgpuState,
     wgpu_texture::WgpuTexture, FrameRenderTarget,
 };
+
 use crate::arena::ArenaKey;
 use crate::utils::unwrap_mut;
+use test_uniform::TestUniform;
+
+pub(crate) mod test_uniform;
 
 /// Default 2D renderer.
 ///
@@ -14,6 +18,12 @@ use crate::utils::unwrap_mut;
 pub struct Renderer2d {
     texture_bind_group_layout: wgpu::BindGroupLayout,
     pipeline_key: ArenaKey,
+
+    // TESTING
+    test_uniform: TestUniform,
+    test_uniform_bind_group_layout: wgpu::BindGroupLayout,
+
+    test_uniform_bind_group_key: ArenaKey,
 }
 
 #[allow(dead_code)]
@@ -21,19 +31,34 @@ impl Renderer2d {
     pub fn new(ctx: &mut crate::EngineContext) -> Self {
         let wgpu_state = &mut unwrap_mut(&mut ctx.rendering_system).state;
 
-        let desc = WgpuTexture::get_wgpu_bind_group_layout_descriptor();
+        let tex_desc = WgpuTexture::get_wgpu_bind_group_layout_descriptor();
 
-        let texture_bind_group_layout = wgpu_state.device.create_bind_group_layout(&desc);
+        let texture_bind_group_layout = wgpu_state.device.create_bind_group_layout(&tex_desc);
+
+        let uni_desc = TestUniform::get_wgpu_bind_group_layout_descriptor();
+
+        let test_uniform_bind_group_layout = wgpu_state.device.create_bind_group_layout(&uni_desc);
 
         let pipeline_key = wgpu_state.add_new_render_pipeline::<TexturedVertex>(
             rend_2d_vert_shader(),
             rend_2d_frag_shader(),
-            &[&texture_bind_group_layout],
+            &[&texture_bind_group_layout, &test_uniform_bind_group_layout],
+        );
+
+        let test_uniform = TestUniform::new(&mut wgpu_state.device);
+
+        let test_uniform_bind_group_key = wgpu_state.add_new_uniform_bind_group(
+            &test_uniform_bind_group_layout,
+            &test_uniform,
+            Some("test_uniform_bind_group"),
         );
 
         Self {
             texture_bind_group_layout,
             pipeline_key,
+            test_uniform,
+            test_uniform_bind_group_layout,
+            test_uniform_bind_group_key,
         }
     }
 
@@ -45,6 +70,8 @@ impl Renderer2d {
         texture_bind_group_key: ArenaKey,
     ) {
         let wgpu_state = &mut unwrap_mut(&mut ctx.rendering_system).state;
+
+        self.test_update_uniform(wgpu_state);
 
         let vertices = &[
             // A
@@ -88,11 +115,15 @@ impl Renderer2d {
             let mut render_pass = wgpu_state.make_render_pass(frt);
 
             render_pass
-                .set_pipeline(self.pipeline_key, &wgpu_state)
+                .set_pipeline(self.pipeline_key, wgpu_state)
                 .unwrap();
 
             render_pass
-                .set_bind_group(0, texture_bind_group_key, &[], &wgpu_state)
+                .set_bind_group(0, texture_bind_group_key, &[], wgpu_state)
+                .unwrap();
+
+            render_pass
+                .set_bind_group(1, self.test_uniform_bind_group_key, &[], wgpu_state)
                 .unwrap();
 
             render_pass
@@ -143,6 +174,12 @@ impl Renderer2d {
             texture_key,
             texture_label,
         )
+    }
+
+    fn test_update_uniform(&mut self, wgpu_state: &mut WgpuState) {
+        self.test_uniform.content.num -= 0.001;
+
+        wgpu_state.update_uniform_buffer(&self.test_uniform);
     }
 }
 

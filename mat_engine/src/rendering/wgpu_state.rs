@@ -1,6 +1,6 @@
 use super::{
-    bind_group::BindGroupable, frame::FrameRenderTarget, vertex_trait::Vertex,
-    wgpu_texture::WgpuTexture,
+    bind_group::BindGroupable, frame::FrameRenderTarget, generic_uniform::Uniform,
+    vertex_trait::Vertex, wgpu_texture::WgpuTexture,
 };
 use crate::{
     arena::{Arena, ArenaKey},
@@ -261,6 +261,44 @@ impl WgpuState {
             wgpu_bind_group,
             label,
         })
+    }
+
+    /// Analogous to `add_new_texture_bind_group()`, but for uniforms.
+    /// Note that while we currently (as of the time I wrote this, but it may change) store
+    /// textures inside WgpuState, we do NOT store uniforms in WgpuState, so we pass in
+    /// the uniform itself and not a key, which is the main difference between
+    /// `add_new_texture_bind_group()` and `add_new_uniform_bind_group()`
+    pub(super) fn add_new_uniform_bind_group<T: Uniform>(
+        &mut self,
+        bind_group_layout: &wgpu::BindGroupLayout,
+        uniform: &T,
+        label: Option<&'static str>,
+    ) -> ArenaKey {
+        let wgpu_bind_group = uniform.make_wgpu_bind_group(bind_group_layout, &mut self.device);
+
+        self.bind_groups.insert(BindGroup {
+            wgpu_bind_group,
+            label,
+        })
+    }
+
+    /// Updates a single uniform's buffer using it's `Uniform::update_buffer()` method.
+    /// The buffer is stored inside the uniform.
+    ///
+    /// See `wgpu_generic_uniform::Uniform` and the `Uniform::update_buffer()` method for specific details.
+    ///
+    /// Note: We create a new command encoder every time this is called, and we submit to the queue
+    /// every time as well. I'm not sure if this is a possible performance issue.
+    pub(super) fn update_uniform_buffer<T: Uniform>(&mut self, uniform: &T) {
+        let mut enc = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("test_uniform_update_encoder"),
+            });
+
+        uniform.update_buffer(&mut enc, &mut self.device);
+
+        self.queue.submit(&[enc.finish()]);
     }
 }
 

@@ -6,6 +6,7 @@ pub mod shaders;
 
 pub(crate) mod bind_group;
 pub(crate) mod colored_vertex;
+pub(crate) mod generic_uniform;
 pub(crate) mod imgui_rend;
 pub(crate) mod textured_vertex;
 pub(crate) mod vertex_trait;
