@@ -51,6 +51,18 @@ impl Renderer2d {
         }
     }
 
+    pub fn update(&mut self, ctx: &mut crate::EngineContext) {
+        let wgpu_state = &mut unwrap_mut(&mut ctx.rendering_system).state;
+
+        self.camera.feed_screen_size(
+            wgpu_state.window_inner_width,
+            wgpu_state.window_inner_height,
+        );
+
+        self.camera.mul_scale(0.9999);
+        self.camera.update(wgpu_state);
+    }
+
     /// You may obtain a new `texture_bind_group_key` by calling `create_new_texture_bind_group()`.
     pub fn render_sample_texture(
         &mut self,
@@ -59,9 +71,6 @@ impl Renderer2d {
         texture_bind_group_key: ArenaKey,
     ) {
         let wgpu_state = &mut unwrap_mut(&mut ctx.rendering_system).state;
-
-        self.camera.mul_scale(0.9999);
-        self.camera.update(wgpu_state);
 
         let vertices = &[
             // A

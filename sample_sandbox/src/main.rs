@@ -28,6 +28,8 @@ impl mat_engine::application::Application for MyApp {
     }
 
     fn update(&mut self, ctx: &mut mat_engine::context::EngineContext) {
+        self.rend_2d.as_mut().unwrap().update(ctx);
+
         mat_engine::imgui::update(ctx);
     }
 

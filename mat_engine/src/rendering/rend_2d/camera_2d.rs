@@ -51,6 +51,15 @@ impl Camera2d {
         out
     }
 
+    /// Temporary. TODO: Replace once event system has been implemented.
+    ///
+    /// Updates screen size if it is different from what camera stored.
+    pub(super) fn feed_screen_size(&mut self, screen_width: u32, screen_height: u32) {
+        if (self.screen_width != screen_width) || (self.screen_height != screen_height) {
+            self.set_screen_size(screen_width, screen_height);
+        }
+    }
+
     pub(super) fn set_screen_size(&mut self, screen_width: u32, screen_height: u32) {
         self.screen_width = screen_width;
         self.screen_height = screen_height;
@@ -109,7 +118,7 @@ impl Camera2d {
     fn update_uniform(&mut self, wgpu_state: &mut WgpuState) {
         self.camera_uniform_component.content.projection_matrix = self.camera_matrix;
 
-        log::trace!("Updating camera uniform, new mat> {:?}", self.camera_matrix);
+        // log::trace!("Updating camera uniform, new mat> {:?}", self.camera_matrix);
 
         wgpu_state.update_uniform_buffer(&self.camera_uniform_component);
     }
