@@ -7,8 +7,10 @@ use super::{
 
 use crate::arena::ArenaKey;
 use crate::utils::unwrap_mut;
+use camera_2d::Camera2d;
 use test_uniform::TestUniform;
 
+pub(crate) mod camera_2d;
 pub(crate) mod test_uniform;
 
 /// Default 2D renderer.
@@ -18,12 +20,7 @@ pub(crate) mod test_uniform;
 pub struct Renderer2d {
     texture_bind_group_layout: wgpu::BindGroupLayout,
     pipeline_key: ArenaKey,
-
-    // TESTING
-    test_uniform: TestUniform,
-    test_uniform_bind_group_layout: wgpu::BindGroupLayout,
-
-    test_uniform_bind_group_key: ArenaKey,
+    camera: Camera2d,
 }
 
 #[allow(dead_code)]
@@ -35,30 +32,22 @@ impl Renderer2d {
 
         let texture_bind_group_layout = wgpu_state.device.create_bind_group_layout(&tex_desc);
 
-        let uni_desc = TestUniform::get_wgpu_bind_group_layout_descriptor();
-
-        let test_uniform_bind_group_layout = wgpu_state.device.create_bind_group_layout(&uni_desc);
+        let camera = Camera2d::new(
+            wgpu_state.window_inner_width,
+            wgpu_state.window_inner_height,
+            wgpu_state,
+        );
 
         let pipeline_key = wgpu_state.add_new_render_pipeline::<TexturedVertex>(
             rend_2d_vert_shader(),
             rend_2d_frag_shader(),
-            &[&texture_bind_group_layout, &test_uniform_bind_group_layout],
-        );
-
-        let test_uniform = TestUniform::new(&mut wgpu_state.device);
-
-        let test_uniform_bind_group_key = wgpu_state.add_new_uniform_bind_group(
-            &test_uniform_bind_group_layout,
-            &test_uniform,
-            Some("test_uniform_bind_group"),
+            &[&texture_bind_group_layout, &camera.camera_bind_group_layout],
         );
 
         Self {
             texture_bind_group_layout,
             pipeline_key,
-            test_uniform,
-            test_uniform_bind_group_layout,
-            test_uniform_bind_group_key,
+            camera,
         }
     }
 
@@ -71,7 +60,8 @@ impl Renderer2d {
     ) {
         let wgpu_state = &mut unwrap_mut(&mut ctx.rendering_system).state;
 
-        self.test_update_uniform(wgpu_state);
+        self.camera.mul_scale(0.9999);
+        self.camera.update(wgpu_state);
 
         let vertices = &[
             // A
@@ -123,7 +113,7 @@ impl Renderer2d {
                 .unwrap();
 
             render_pass
-                .set_bind_group(1, self.test_uniform_bind_group_key, &[], wgpu_state)
+                .set_bind_group(1, self.camera.camera_bind_group_key, &[], wgpu_state)
                 .unwrap();
 
             render_pass
@@ -174,12 +164,6 @@ impl Renderer2d {
             texture_key,
             texture_label,
         )
-    }
-
-    fn test_update_uniform(&mut self, wgpu_state: &mut WgpuState) {
-        self.test_uniform.content.num -= 0.001;
-
-        wgpu_state.update_uniform_buffer(&self.test_uniform);
     }
 }
 

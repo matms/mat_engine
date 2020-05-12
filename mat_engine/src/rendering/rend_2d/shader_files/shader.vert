@@ -7,16 +7,13 @@ layout(location=0) out vec2 v_tex_coords;
 
 layout(set=1, binding=0) 
 uniform TestUniform{
-    float num;
+    mat4 proj_mat;
 };
 
 
 void main() {
     v_tex_coords = a_tex_coords;
-
-    vec4 pos = vec4(a_position, 1.0);
-    pos.x += num;
-    gl_Position = pos;
+    gl_Position =  proj_mat * vec4(a_position, 1.0);
 }
 
  
