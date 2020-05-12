@@ -22,13 +22,8 @@ pub(crate) struct WgpuState {
 
     // --- ARENAS ---
     pub(super) textures: Arena<WgpuTexture>,
-    pub(super) default_texture_key: ArenaKey,
-
     pub(super) bind_groups: Arena<BindGroup>,
-    pub(super) default_bind_group_key: ArenaKey,
-
     pub(super) render_pipelines: Arena<wgpu::RenderPipeline>,
-    pub(super) default_render_pipeline_key: ArenaKey,
 }
 
 impl WgpuState {
@@ -89,12 +84,7 @@ impl WgpuState {
         let textures = Arena::new();
         let bind_groups = Arena::new();
 
-        // Uninitialized
-        let default_texture_key = ArenaKey::default();
-        let default_bind_group_key = ArenaKey::default();
-        let default_render_pipeline_key = ArenaKey::default();
-
-        let mut out = Self {
+        Self {
             surface,
             adapter,
             device,
@@ -104,41 +94,9 @@ impl WgpuState {
             window_inner_width,
             window_inner_height,
             render_pipelines,
-            default_texture_key,
             textures,
-            default_render_pipeline_key,
             bind_groups,
-            default_bind_group_key,
-        };
-
-        // Initialize the default_<...>_key members.
-        out.init_arena_defaults();
-
-        out
-    }
-
-    /// Initialize the default_<...>_key members.
-    fn init_arena_defaults(&mut self) {
-        self.default_texture_key = self.add_new_texture_from_bytes(
-            crate::rendering::rend_2d::wgpu_texture::default_texture_bytes(),
-            Some("default_texture"),
-        );
-
-        let texture_bind_group_layout = self
-            .device
-            .create_bind_group_layout(&WgpuTexture::get_wgpu_bind_group_layout_descriptor());
-
-        self.default_bind_group_key = self.add_new_texture_bind_group(
-            &texture_bind_group_layout,
-            self.default_texture_key,
-            Some("default_bind_group"),
-        );
-
-        self.default_render_pipeline_key = self.add_new_render_pipeline::<TexturedVertex>(
-            crate::rendering::shaders::default_vert_shader(),
-            crate::rendering::shaders::default_frag_shader(),
-            &[&texture_bind_group_layout],
-        );
+        }
     }
 
     pub(super) fn resize(&mut self, new_inner_width: u32, new_inner_height: u32) {

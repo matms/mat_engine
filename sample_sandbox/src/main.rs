@@ -1,5 +1,9 @@
+use mat_engine::{arena::ArenaKey, rendering::rend_2d::Renderer2d};
+
 struct MyApp {
     time: std::time::SystemTime,
+    rend_2d: Option<Renderer2d>,
+    tex_key: ArenaKey,
 }
 
 impl mat_engine::application::Application for MyApp {
@@ -9,6 +13,18 @@ impl mat_engine::application::Application for MyApp {
         self.time = std::time::SystemTime::now();
 
         ctx.imgui_init();
+
+        self.rend_2d = Some(Renderer2d::new(ctx));
+
+        self.tex_key = self
+            .rend_2d
+            .as_mut()
+            .unwrap()
+            .create_new_texture_bind_group(
+                ctx,
+                include_bytes!("colorscales.png"),
+                Some("Sample Texture"),
+            );
     }
 
     fn update(&mut self, ctx: &mut mat_engine::context::EngineContext) {
@@ -25,6 +41,11 @@ impl mat_engine::application::Application for MyApp {
 
         //log::warn!("RENDER START");
         let mut frt = mat_engine::rendering::start_render(ctx);
+
+        self.rend_2d
+            .as_mut()
+            .unwrap()
+            .render_sample_texture(ctx, &mut frt, self.tex_key);
 
         //Render imgui
 
@@ -71,5 +92,7 @@ fn main() {
 
     mat_engine::run(Box::new(MyApp {
         time: std::time::SystemTime::UNIX_EPOCH,
+        rend_2d: None,
+        tex_key: ArenaKey::default(),
     }));
 }

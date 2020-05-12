@@ -1,12 +1,12 @@
 // See https://sotrh.github.io/learn-wgpu/
 
 pub mod frame;
+pub mod rend_2d;
 pub mod shaders;
 
 pub(crate) mod bind_group;
 pub(crate) mod colored_vertex;
 pub(crate) mod imgui_rend;
-pub(crate) mod rend_2d;
 pub(crate) mod textured_vertex;
 pub(crate) mod vertex_trait;
 pub(crate) mod wgpu_state;
@@ -54,73 +54,10 @@ impl RenderingSystem {
     fn start_render(&mut self) -> FrameRenderTarget {
         let mut frt = self.state.start_frame_render();
 
-        // TODO: We obviously shouldn't render anything here.
-        // Instead, we should move this code somewhere else.
-        // START TEMPORARY, TESTING PURPOSES, RENDERING CODE
-        let vertices = &[
-            // A
-            textured_vertex::TexturedVertex {
-                position: [-0.5, -0.5, 0.0],
-                tex_coords: [0.0, 1.0],
-            },
-            // B
-            textured_vertex::TexturedVertex {
-                position: [0.5, -0.5, 0.0],
-                tex_coords: [1.0, 1.0],
-            },
-            // C
-            textured_vertex::TexturedVertex {
-                position: [0.5, 0.5, 0.0],
-                tex_coords: [1.0, 0.0],
-            },
-            // D
-            textured_vertex::TexturedVertex {
-                position: [-0.5, 0.5, 0.0],
-                tex_coords: [0.0, 0.0],
-            },
-        ];
-
-        let vertex_buffer = self
-            .state
-            .device
-            .create_buffer_with_data(bytemuck::cast_slice(vertices), wgpu::BufferUsage::VERTEX);
-
-        // See pipeline settings for whether index should be u16 or u32
-        let indices: &[u16; 6] = &[
-            0, 1, 2, // A B C
-            0, 2, 3, // A C D
-        ];
-
-        let index_buffer = self
-            .state
-            .device
-            .create_buffer_with_data(bytemuck::cast_slice(indices), wgpu::BufferUsage::INDEX);
-
-        // We use a scope here bc we need to borrow frt mutably.
-        {
-            let mut render_pass = self.state.make_render_pass(&mut frt);
-
-            render_pass
-                .set_pipeline(self.state.default_render_pipeline_key, &self.state)
-                .unwrap();
-
-            render_pass
-                .set_bind_group(0, self.state.default_bind_group_key, &[], &self.state)
-                .unwrap();
-
-            render_pass
-                .wgpu_render_pass
-                .set_vertex_buffer(0, &vertex_buffer, 0, 0);
-
-            render_pass
-                .wgpu_render_pass
-                .set_index_buffer(&index_buffer, 0, 0);
-
-            render_pass
-                .wgpu_render_pass
-                .draw_indexed(0..(indices.len() as u32), 0, 0..1);
-        }
-        // END TEMPORARY, TESTING PURPOSES, RENDERING CODE
+        // Clear screen?
+        // This may be an issue, with the way we do this.
+        // TODO: Investigate.
+        self.state.make_render_pass(&mut frt);
 
         frt
     }
