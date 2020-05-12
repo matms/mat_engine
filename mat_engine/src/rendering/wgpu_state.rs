@@ -1,6 +1,6 @@
 use super::{
     bind_group::BindGroupable, frame::FrameRenderTarget, rend_2d::wgpu_texture::WgpuTexture,
-    textured_vertex::TexturedVertex, vertex_trait::Vertex,
+    vertex_trait::Vertex,
 };
 use crate::{
     arena::{Arena, ArenaKey},
@@ -21,6 +21,7 @@ pub(crate) struct WgpuState {
     pub(super) window_inner_height: u32,
 
     // --- ARENAS ---
+    // TODO: Maybe move these somewhere else...
     pub(super) textures: Arena<WgpuTexture>,
     pub(super) bind_groups: Arena<BindGroup>,
     pub(super) render_pipelines: Arena<wgpu::RenderPipeline>,
