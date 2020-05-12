@@ -24,6 +24,7 @@ pub(super) struct TestUniform {
     pub(super) buffer: wgpu::Buffer,
 }
 
+#[allow(dead_code)]
 impl TestUniform {
     pub(super) fn new(device: &mut wgpu::Device) -> Self {
         let content = TestUniformContent { num: 0.5 };

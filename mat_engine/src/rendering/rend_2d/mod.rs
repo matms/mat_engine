@@ -8,7 +8,6 @@ use super::{
 use crate::arena::ArenaKey;
 use crate::utils::unwrap_mut;
 use camera_2d::Camera2d;
-use test_uniform::TestUniform;
 
 pub(crate) mod camera_2d;
 pub(crate) mod test_uniform;
