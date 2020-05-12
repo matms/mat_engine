@@ -21,7 +21,7 @@ pub(crate) struct WgpuState {
     pub(super) window_inner_height: u32,
 
     // --- ARENAS ---
-    // TODO: Maybe move these somewhere else...
+    // TODO: Maybe move (at least some of) these somewhere else...
     pub(super) textures: Arena<WgpuTexture>,
     pub(super) bind_groups: Arena<BindGroup>,
     pub(super) render_pipelines: Arena<wgpu::RenderPipeline>,
@@ -345,6 +345,8 @@ impl<'a> RenderPass<'a> {
     }
 }
 
+// TODO: Is it even worth it keeping this type around? Also, If I'm gonna have this,
+// shouldn't I also have RenderPipeline wrapped, for consistency?
 pub(crate) struct BindGroup {
     pub(super) wgpu_bind_group: wgpu::BindGroup,
     #[allow(dead_code)]
