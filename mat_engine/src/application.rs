@@ -6,14 +6,26 @@
 /// Nonetheless, most of the engine is still modular, and the user is
 /// expected to init most of the engine parts they wish to use.
 ///
-/// CONTROL FLOW:
+/// All methods are given a `ctx` parameter. This is a handle to the engine, that is
+/// needed for various useful procedures. You cannot store this handle (rust lifetime woes),
+/// so use the parameter.
 ///
-/// INIT -> LOOP { UPDATE -> RENDER } -> CLOSE
+/// CONTROL FLOW*:
+///
+/// INIT() -> LOOP { UPDATE() -> RENDER() } -> CLOSE()
+///
+/// *In general, exceptions/corner-cases exist.
 ///
 /// TODO: Investigate whether to simulate some sort of event_poll() system, or use
 /// handle_event.
 pub trait Application {
-    /// Called once, at initialization.
+    /// Called once, at initialization, after some core engine systems have been initialized.
+    ///
+    /// To allow access to these engine systems, we currently delay the init call to the engine.
+    /// Unfortunately, this means that you likely still need a `new()` method or something similar,
+    /// as you have to give the engine an Application object (see `crate::run()`).
+    ///
+    /// TODO: Investigate alternatives to this. Could we have the engine create `Application`? Maybe...
     #[allow(unused_variables)]
     fn init(&mut self, ctx: &mut crate::context::EngineContext) {}
 
@@ -24,11 +36,17 @@ pub trait Application {
     #[allow(unused_variables)]
     fn close(&mut self, ctx: &mut crate::context::EngineContext) {}
 
-    /// Called once per frame, after handling events but before rendering.
+    /// Called once per frame, after handling events* but before rendering.
+    ///
+    /// *TODO: Better investigate and document event handling order and corner-cases.
     #[allow(unused_variables)]
     fn update(&mut self, ctx: &mut crate::context::EngineContext) {}
 
-    /// Called once per frame, after `Application::update()`.
+    /// Called once per frame, usually* after `Application::update()`.
+    ///
+    /// Note: Sometimes, the OS / winit may request a redraw (for example, if the app window is resized),
+    /// which could cause `render()` to be called without a preceding `update()` call. You should be careful
+    /// to ensure your application functions (reasonably) correctly in this case.
     #[allow(unused_variables)]
     fn render(&mut self, ctx: &mut crate::context::EngineContext) {}
 }

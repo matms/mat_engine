@@ -6,10 +6,10 @@
 /// Use of a key from one arena to index into another* is not supported, and may cause serious issues.
 ///
 /// *(Except, of course, for secondary arenas, if they have been implemented).
+///
+/// This is a newtype around `::slotmap::DefaultKey`.
 #[derive(Copy, Clone, Debug, Default)]
 pub struct ArenaKey(::slotmap::DefaultKey);
-
-/*pub type ArenaKey = ::slotmap::DefaultKey;*/
 
 /// Generational Arena
 ///

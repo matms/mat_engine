@@ -1,6 +1,8 @@
-//! Not to be confused with the imgui crate.
+//! Not to be confused with the imgui crate, with which this module interacts
 //!
 //! In this documentation, I'll use `imgui` for this module, and `::imgui` for the external crate.
+//!
+//! For actual use instructions, see the `::imgui` crate.
 
 use crate::{
     rendering::imgui_rend::ImguiRenderingSubsystem,
@@ -17,7 +19,12 @@ lazy_static::lazy_static! {
 }
 
 /// The equivalent of `add_render_fn`, except that it uses a
-/// global, thread-shared, queue (you needn't pass in ctx). Should only be used for debugging.
+/// global, thread-shared, queue (you needn't pass in ctx).
+///
+/// `USE_GLOBAL_DEBUG_RENDER_FNS` must be true for this function to work.
+///
+/// Should only be used for debugging (in circumstances where getting a handle
+/// to ctx would be prohibitively difficult).
 ///
 /// Currently panics if it cannot lock mutex. Maybe we should change this behavior in the future.
 ///
@@ -47,12 +54,14 @@ pub fn update(ctx: &mut crate::EngineContext) {
     unwrap_mut(&mut ctx.imgui_system).update(unwrap_ref(&mut ctx.windowing_system));
 }
 
-/// Adds a function/closure that takes in `&mut ::imgui::Ui` (from the imgui crate) and calls
+/// Adds a function/closure that takes in `&mut ::imgui::Ui` (from the `::imgui` crate) and calls
 /// methods on it to draw imgui elements to a rendering queue.
 ///
 /// The closures in the queue get executed whenever `imgui::render()` (from this crate) is called.
 /// The queue is then cleared (after all, this is an immediate mode GUI system). If you
 /// want to display the same thing every frame, you must call this function every frame.
+///
+/// For actual use instructions (i.e, what to call inside the closure), see the `::imgui` crate.
 ///
 /// This is a wrapper method.
 pub fn add_render_fn<F>(ctx: &mut crate::EngineContext, func: F)
@@ -66,8 +75,8 @@ where
 /// Actually render the closures in the queue. See `add_render_fn()` for how to add these closures.
 /// It also clears the queue once it is done.
 ///
-/// Note: It also operates on a global, thread shared queue, iff `USE_GLOBAL_DEBUG_RENDER_FNS` is true.
-/// In this case, see `global_debug_add_render_fn()` for info.
+/// Note: It additionally operates on a global, thread shared queue, iff `USE_GLOBAL_DEBUG_RENDER_FNS`
+/// is true. In this case, see `global_debug_add_render_fn()` for info.
 ///
 /// This is a wrapper method.
 pub fn render(ctx: &mut crate::EngineContext, frt: &mut crate::rendering::FrameRenderTarget) {
@@ -79,7 +88,7 @@ pub fn render(ctx: &mut crate::EngineContext, frt: &mut crate::rendering::FrameR
 }
 
 /// Processes winit events. If using the imgui system, should be called in the winit event loop. See
-/// "lib.rs"'s `process_event()`.
+/// `crate::process_event()`.
 ///
 /// Note: This may be removed in the future and replaced by an Event System.
 ///

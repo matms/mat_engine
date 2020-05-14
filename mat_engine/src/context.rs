@@ -17,6 +17,8 @@ use crate::{imgui::ImguiSystem, rendering::RenderingSystem, windowing::Windowing
 /// | rendering |  A  |
 /// | imgui     |  M  |
 ///
+/// Any use of an uninitialized system is considered a bug and may panic.
+///
 /// INTERNAL INFORMATION:
 ///
 /// To access systems conveniently, use `utils::unwrap_ref()` and `utils::unwrap_mut()`

@@ -13,7 +13,7 @@ pub mod windowing;
 pub use context::EngineContext;
 
 /// Execute a given Application. Doesn't return, use the `Application::close()` method to
-/// handle shutdown.
+/// gracefully handle shutdown. See module `windowing` for more info.
 pub fn run(mut app: Box<dyn application::Application>) -> ! {
     log::trace!("Starting mat_engine");
 
@@ -46,7 +46,9 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
         } else if ctx.windowing_system.as_mut().unwrap().force_quit {
             log::trace!("Force quitting... ignoring outsanding event");
             *control_flow = winit::event_loop::ControlFlow::Exit;
+        // Normal event handling loop
         } else {
+            // Handle events by type
             match &event {
                 winit::event::Event::UserEvent(request) => {
                     match request {
@@ -85,6 +87,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                 winit::event::Event::MainEventsCleared => {
                     app.update(&mut ctx);
 
+                    // After `update()`, we want to run `render()`
                     {
                         ctx.windowing_system
                             .as_mut()
@@ -107,6 +110,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
                 }
             }
 
+            // Additional code that must be run for every event (excepting corner cases involving quitting).
             process_event(&mut ctx, &event);
         }
     })

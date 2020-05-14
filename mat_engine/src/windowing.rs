@@ -1,7 +1,7 @@
 use crate::utils::unwrap_mut;
 
 /// Sends a quit request to winit's event loop. This will, (possibly after a delay, as
-/// queued events will still be processed), cause the loop to exit. Application::close()
+/// queued events will still be processed), cause the loop to exit. `Application::close()`
 /// will be automatically called, there is no need for you to call it.
 ///
 /// This is a wrapper method.
@@ -10,7 +10,7 @@ pub fn queue_quit(ctx: &mut crate::EngineContext) {
 }
 
 /// Forces winit's event loop to quit, ignoring all outstanding winit events.
-/// Application::close() will be automatically called, there is no need for
+/// `Application::close()` will be automatically called, there is no need for
 /// you to call it.
 ///
 /// This is a wrapper method.
