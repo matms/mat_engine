@@ -30,12 +30,14 @@ impl mat_engine::application::Application for MyApp {
     }
 
     fn update(&mut self, ctx: &mut mat_engine::context::EngineContext) {
+        /*
         self.rend_2d.as_mut().unwrap().camera.mul_scale(0.9998);
         self.rend_2d
             .as_mut()
             .unwrap()
             .camera
             .translate_position(glm::vec2(0.0005, 0.0005));
+        */
 
         self.rend_2d.as_mut().unwrap().update(ctx);
 
@@ -57,6 +59,28 @@ impl mat_engine::application::Application for MyApp {
             .as_mut()
             .unwrap()
             .render_sample_texture(ctx, &mut frt, self.tex_key);
+
+        let a = glm::vec2(0.0, 30.0);
+        log::trace!(
+            "A) World coords {:?} correspond to pixel screen coords {:?}",
+            a,
+            self.rend_2d
+                .as_mut()
+                .unwrap()
+                .camera
+                .world_to_pixel_screen_coords(&a)
+        );
+
+        let b = glm::vec2(512.0, 355.0);
+        log::trace!(
+            "C) Pixel screen coords {:?} correspond to world coords {:?}",
+            b,
+            self.rend_2d
+                .as_mut()
+                .unwrap()
+                .camera
+                .pixel_screen_to_world_coords(&b)
+        );
 
         //Render imgui
 

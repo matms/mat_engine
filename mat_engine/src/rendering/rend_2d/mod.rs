@@ -1,5 +1,10 @@
 //! This module provides a default 2d renderer.
 
+pub(crate) mod camera_2d;
+pub(crate) mod instance;
+pub(crate) mod test_uniform;
+pub(crate) mod vertex_2d;
+
 use super::{
     bind_group::BindGroupable, shaders, vertex_buffer::VertexBufferable, wgpu_state::WgpuState,
     wgpu_texture::WgpuTexture, FrameRenderTarget,
@@ -10,11 +15,6 @@ use crate::utils::unwrap_mut;
 use camera_2d::Camera2d;
 use instance::{Instance, InstanceData};
 use vertex_2d::Vertex2d;
-
-pub(crate) mod camera_2d;
-pub(crate) mod instance;
-pub(crate) mod test_uniform;
-pub(crate) mod vertex_2d;
 
 /// Default 2D renderer.
 ///
@@ -112,10 +112,12 @@ impl Renderer2d {
 
         let instances = vec![
             Instance {
-                position: nalgebra_glm::vec2(0.2, 0.2),
+                position: nalgebra_glm::vec2(0.0, 0.0),
+                scale: 10.0,
             },
             Instance {
-                position: nalgebra_glm::vec2(-0.2, -0.2),
+                position: nalgebra_glm::vec2(0.0, 30.0),
+                scale: 20.0,
             },
         ];
 

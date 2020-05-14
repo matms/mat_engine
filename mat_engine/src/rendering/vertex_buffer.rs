@@ -9,6 +9,8 @@ pub(super) trait VertexBufferable {
     ///
     /// The user is responsible for managing shader locations. Giving a range of incorrect span _may_
     /// (probably should) panic.
+    ///
+    /// TODO: Should we also support inclusive range syntax? Probably...
     fn buffer_descriptor(shader_locations: Range<u32>)
         -> super::wgpu_pipeline::VertexBufferSetting;
 }

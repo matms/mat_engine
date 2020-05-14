@@ -3,16 +3,24 @@ use crate::rendering::{vertex_buffer::VertexBufferable, wgpu_pipeline::VertexBuf
 use nalgebra_glm as glm;
 use std::ops::Range;
 
+/// Instance object for `Renderer2d`. Allows translating and scaling sprites, but currently doesn't
+/// allow for rotating them.
 pub(super) struct Instance {
     pub position: glm::Vec2,
+    pub scale: f32,
 }
 
 impl Instance {
     /// Computes the model matrix and returns an InstanceData object containing it
+    ///
+    /// TODO: Investigate ways of caching/storing the matrix across frames.
     pub(super) fn to_data(&self) -> InstanceData {
         let translate: glm::Vec3 = glm::vec3(self.position.x, self.position.y, 0.0);
 
-        let mat = glm::translate(&glm::identity(), &translate);
+        let scale: glm::Vec3 = glm::vec3(self.scale, self.scale, 0.0);
+
+        let mut mat = glm::scale(&glm::identity(), &scale);
+        mat = glm::translate(&glm::identity(), &translate) * mat;
 
         InstanceData { model_matrix: mat }
     }
@@ -50,6 +58,11 @@ impl VertexBufferable for InstanceData {
             step_mode: wgpu::InputStepMode::Instance,
             attributes: vec![
                 // Total of 16 floats ( 4 x 4 ) -> corresponds to one Mat4
+                // We need to do this this because the largest floating point vertex attribute possible is
+                // Float4.
+                //
+                // In the shader, you can just write mat4 and indicate start_shader_location for location,
+                // and it just works.
                 wgpu::VertexAttributeDescriptor {
                     offset: 0,
                     format: wgpu::VertexFormat::Float4,
