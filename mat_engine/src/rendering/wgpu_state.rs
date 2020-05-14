@@ -2,7 +2,6 @@ use super::{
     bind_group::BindGroupable,
     frame::FrameRenderTarget,
     generic_uniform::Uniform,
-    vertex_trait::Vertex,
     wgpu_pipeline::{PipelineBuilder, VertexBufferSetting},
     wgpu_texture::WgpuTexture,
 };
