@@ -1,4 +1,6 @@
+use super::{vertex_buffer::VertexBufferable, wgpu_pipeline::VertexBufferSetting};
 use crate::rendering::vertex_trait::Vertex;
+use std::ops::Range;
 use zeroable::Zeroable;
 
 #[repr(C)]
@@ -19,25 +21,31 @@ static_assertions::const_assert_eq!(
 // We need to check for the absence of padding, see static assert above.
 unsafe impl bytemuck::Pod for TexturedVertex {}
 
-impl Vertex for TexturedVertex {
-    fn buffer_descriptor<'a>() -> wgpu::VertexBufferDescriptor<'a> {
-        wgpu::VertexBufferDescriptor {
+impl VertexBufferable for TexturedVertex {
+    fn buffer_descriptor(shader_locations: Range<u32>) -> VertexBufferSetting {
+        let start_shader_location = shader_locations.start;
+
+        assert!(shader_locations.len() == 2);
+
+        VertexBufferSetting {
             stride: std::mem::size_of::<TexturedVertex>() as wgpu::BufferAddress,
             step_mode: wgpu::InputStepMode::Vertex,
-            attributes: &[
+            attributes: vec![
                 wgpu::VertexAttributeDescriptor {
                     // Position
                     offset: 0,
                     format: wgpu::VertexFormat::Float3,
-                    shader_location: 0,
+                    shader_location: start_shader_location,
                 },
                 wgpu::VertexAttributeDescriptor {
                     // Tex Coords
                     offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                     format: wgpu::VertexFormat::Float2,
-                    shader_location: 1,
+                    shader_location: start_shader_location + 1,
                 },
             ],
         }
     }
 }
+
+impl Vertex for TexturedVertex {}

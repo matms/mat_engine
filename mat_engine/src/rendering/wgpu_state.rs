@@ -1,6 +1,10 @@
 use super::{
-    bind_group::BindGroupable, frame::FrameRenderTarget, generic_uniform::Uniform,
-    vertex_trait::Vertex, wgpu_texture::WgpuTexture,
+    bind_group::BindGroupable,
+    frame::FrameRenderTarget,
+    generic_uniform::Uniform,
+    vertex_trait::Vertex,
+    wgpu_pipeline::{PipelineBuilder, VertexBufferSetting},
+    wgpu_texture::WgpuTexture,
 };
 use crate::{
     arena::{Arena, ArenaKey},
@@ -23,6 +27,7 @@ pub(crate) struct WgpuState {
     // --- ARENAS ---
     // TODO: Maybe move (at least some of) these somewhere else...
     pub(super) textures: Arena<WgpuTexture>,
+
     pub(super) bind_groups: Arena<BindGroup>,
     pub(super) render_pipelines: Arena<wgpu::RenderPipeline>,
 }
@@ -152,20 +157,13 @@ impl WgpuState {
         }
     }
 
-    pub(super) fn add_new_render_pipeline<T>(
+    pub(super) fn add_new_render_pipeline(
         &mut self,
         vert_shader: &crate::rendering::shaders::Shader,
         frag_shader: &crate::rendering::shaders::Shader,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
-    ) -> ArenaKey
-    where
-        T: Vertex,
-    {
-        log::trace!(
-            "Creating render pipeline using vertex type `{}`, make sure that you are passing in the correct vertex type.",
-            std::any::type_name::<T>(),
-        );
-
+        vertex_buffers: Vec<VertexBufferSetting>,
+    ) -> ArenaKey {
         let vert_shader_data =
             wgpu::read_spirv(std::io::Cursor::new(vert_shader.as_ref())).unwrap();
 
@@ -179,54 +177,13 @@ impl WgpuState {
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { bind_group_layouts });
 
-        // https://sotrh.github.io/learn-wgpu/
-        // TODO: Allow dynamically creating new pipelines and swapping pipelines
-        let render_pipeline = self
-            .device
-            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                layout: &render_pipeline_layout,
-                vertex_stage: wgpu::ProgrammableStageDescriptor {
-                    module: &vert_shader_module,
-                    entry_point: "main",
-                },
-                fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                    module: &frag_shader_module,
-                    entry_point: "main",
-                }),
-                rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: wgpu::CullMode::Back,
-                    depth_bias: 0,
-                    depth_bias_slope_scale: 0.0,
-                    depth_bias_clamp: 0.0,
-                }),
-                primitive_topology: wgpu::PrimitiveTopology::TriangleList, // TODO: What does this do?
-                color_states: &[wgpu::ColorStateDescriptor {
-                    format: self.swap_chain_descriptor.format,
-                    alpha_blend: wgpu::BlendDescriptor {
-                        src_factor: wgpu::BlendFactor::One,
-                        dst_factor: wgpu::BlendFactor::One,
-                        operation: wgpu::BlendOperation::Add,
-                    },
-                    color_blend: wgpu::BlendDescriptor {
-                        src_factor: wgpu::BlendFactor::SrcAlpha,
-                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,
-                    },
-                    write_mask: wgpu::ColorWrite::ALL,
-                }],
-                depth_stencil_state: None,
-                vertex_state: wgpu::VertexStateDescriptor {
-                    index_format: wgpu::IndexFormat::Uint16,
-                    vertex_buffers: &[
-                        // Todo: Allow dynamically changing this
-                        T::buffer_descriptor(),
-                    ],
-                },
-                sample_count: 1,
-                sample_mask: !0, // All of them
-                alpha_to_coverage_enabled: false,
-            });
+        let render_pipeline = PipelineBuilder::new()
+            .set_vertex_shader(&vert_shader_module)
+            .set_fragment_shader(&frag_shader_module)
+            .set_pipeline_layout(&render_pipeline_layout)
+            .set_swap_chain_descriptor_format(self.swap_chain_descriptor.format)
+            .set_vertex_buffers(vertex_buffers)
+            .build(&mut self.device);
 
         self.render_pipelines.insert(render_pipeline)
     }

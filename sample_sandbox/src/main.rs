@@ -1,5 +1,7 @@
 use mat_engine::{arena::ArenaKey, rendering::rend_2d::Renderer2d};
 
+use nalgebra_glm as glm;
+
 struct MyApp {
     time: std::time::SystemTime,
     rend_2d: Option<Renderer2d>,
@@ -28,6 +30,13 @@ impl mat_engine::application::Application for MyApp {
     }
 
     fn update(&mut self, ctx: &mut mat_engine::context::EngineContext) {
+        self.rend_2d.as_mut().unwrap().camera.mul_scale(0.9998);
+        self.rend_2d
+            .as_mut()
+            .unwrap()
+            .camera
+            .translate_position(glm::vec2(0.0005, 0.0005));
+
         self.rend_2d.as_mut().unwrap().update(ctx);
 
         mat_engine::imgui::update(ctx);

@@ -66,18 +66,22 @@ impl Camera2d {
         self.needs_matrix_update = true;
     }
 
-    pub(super) fn set_scale(&mut self, scale: f32) {
+    pub fn set_scale(&mut self, scale: f32) {
         self.scale = scale;
         self.needs_matrix_update = true;
     }
 
-    pub(super) fn mul_scale(&mut self, factor: f32) {
+    pub fn mul_scale(&mut self, factor: f32) {
         self.set_scale(self.scale * factor);
     }
 
-    pub(super) fn set_position(&mut self, position: glm::Vec2) {
+    pub fn set_position(&mut self, position: glm::Vec2) {
         self.position = position;
         self.needs_matrix_update = true;
+    }
+
+    pub fn translate_position(&mut self, add: glm::Vec2) {
+        self.set_position(self.position + add);
     }
 
     pub(super) fn update(&mut self, wgpu_state: &mut WgpuState) {

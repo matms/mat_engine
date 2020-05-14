@@ -1,16 +1,20 @@
 //! This module provides a default 2d renderer.
 
 use super::{
-    bind_group::BindGroupable, shaders, textured_vertex::TexturedVertex, wgpu_state::WgpuState,
+    bind_group::BindGroupable, shaders, vertex_buffer::VertexBufferable, wgpu_state::WgpuState,
     wgpu_texture::WgpuTexture, FrameRenderTarget,
 };
 
 use crate::arena::ArenaKey;
 use crate::utils::unwrap_mut;
 use camera_2d::Camera2d;
+use instance::{Instance, InstanceData};
+use vertex_2d::Vertex2d;
 
 pub(crate) mod camera_2d;
+pub(crate) mod instance;
 pub(crate) mod test_uniform;
+pub(crate) mod vertex_2d;
 
 /// Default 2D renderer.
 ///
@@ -19,7 +23,7 @@ pub(crate) mod test_uniform;
 pub struct Renderer2d {
     texture_bind_group_layout: wgpu::BindGroupLayout,
     pipeline_key: ArenaKey,
-    camera: Camera2d,
+    pub camera: Camera2d,
 }
 
 #[allow(dead_code)]
@@ -37,10 +41,15 @@ impl Renderer2d {
             wgpu_state,
         );
 
-        let pipeline_key = wgpu_state.add_new_render_pipeline::<TexturedVertex>(
+        let pipeline_key = wgpu_state.add_new_render_pipeline(
             rend_2d_vert_shader(),
             rend_2d_frag_shader(),
             &[&texture_bind_group_layout, &camera.camera_bind_group_layout],
+            // TODO: Implement another builder for this to allow passing parameters
+            vec![
+                Vertex2d::buffer_descriptor(0..2), // 0 and 1 -> color and tex coords
+                InstanceData::buffer_descriptor(2..6), // 2 through 5 inclusive -> single mat4
+            ],
         );
 
         Self {
@@ -58,7 +67,6 @@ impl Renderer2d {
             wgpu_state.window_inner_height,
         );
 
-        self.camera.mul_scale(0.9999);
         self.camera.update(wgpu_state);
     }
 
@@ -71,32 +79,30 @@ impl Renderer2d {
     ) {
         let wgpu_state = &mut unwrap_mut(&mut ctx.rendering_system).state;
 
+        // BASE DATA: VERTICES, INDICES and INSTANCES
+
         let vertices = &[
             // A
-            TexturedVertex {
-                position: [-0.5, -0.5, 0.0],
+            Vertex2d {
+                position: [-0.5, -0.5],
                 tex_coords: [0.0, 1.0],
             },
             // B
-            TexturedVertex {
-                position: [0.5, -0.5, 0.0],
+            Vertex2d {
+                position: [0.5, -0.5],
                 tex_coords: [1.0, 1.0],
             },
             // C
-            TexturedVertex {
-                position: [0.5, 0.5, 0.0],
+            Vertex2d {
+                position: [0.5, 0.5],
                 tex_coords: [1.0, 0.0],
             },
             // D
-            TexturedVertex {
-                position: [-0.5, 0.5, 0.0],
+            Vertex2d {
+                position: [-0.5, 0.5],
                 tex_coords: [0.0, 0.0],
             },
         ];
-
-        let vertex_buffer = wgpu_state
-            .device
-            .create_buffer_with_data(bytemuck::cast_slice(vertices), wgpu::BufferUsage::VERTEX);
 
         // See pipeline settings for whether index should be u16 or u32
         let indices: &[u16; 6] = &[
@@ -104,9 +110,31 @@ impl Renderer2d {
             0, 2, 3, // A C D
         ];
 
+        let instances = vec![
+            Instance {
+                position: nalgebra_glm::vec2(0.2, 0.2),
+            },
+            Instance {
+                position: nalgebra_glm::vec2(-0.2, -0.2),
+            },
+        ];
+
+        // BUFFERS
+
+        let vertex_buffer = wgpu_state
+            .device
+            .create_buffer_with_data(bytemuck::cast_slice(vertices), wgpu::BufferUsage::VERTEX);
+
         let index_buffer = wgpu_state
             .device
             .create_buffer_with_data(bytemuck::cast_slice(indices), wgpu::BufferUsage::INDEX);
+
+        let instance_data: Vec<InstanceData> = instances.iter().map(Instance::to_data).collect();
+
+        let instance_buffer = wgpu_state.device.create_buffer_with_data(
+            bytemuck::cast_slice(&instance_data),
+            wgpu::BufferUsage::VERTEX,
+        );
 
         // We use a scope here bc we need to borrow frt mutably.
         {
@@ -130,11 +158,17 @@ impl Renderer2d {
 
             render_pass
                 .wgpu_render_pass
-                .set_index_buffer(&index_buffer, 0, 0);
+                .set_vertex_buffer(1, &instance_buffer, 0, 0);
 
             render_pass
                 .wgpu_render_pass
-                .draw_indexed(0..(indices.len() as u32), 0, 0..1);
+                .set_index_buffer(&index_buffer, 0, 0);
+
+            render_pass.wgpu_render_pass.draw_indexed(
+                0..(indices.len() as u32),
+                0,
+                0..(instances.len() as u32),
+            );
         }
     }
 

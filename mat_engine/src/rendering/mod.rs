@@ -9,7 +9,9 @@ pub(crate) mod colored_vertex;
 pub(crate) mod generic_uniform;
 pub(crate) mod imgui_rend;
 pub(crate) mod textured_vertex;
+pub(crate) mod vertex_buffer;
 pub(crate) mod vertex_trait;
+pub(crate) mod wgpu_pipeline;
 pub(crate) mod wgpu_state;
 pub(crate) mod wgpu_texture;
 
