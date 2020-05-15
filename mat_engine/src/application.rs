@@ -19,15 +19,10 @@
 /// TODO: Investigate whether to simulate some sort of event_poll() system, or use
 /// handle_event.
 pub trait Application {
-    /// Called once, at initialization, after some core engine systems have been initialized.
+    /// Creates the Application object.
     ///
-    /// To allow access to these engine systems, we currently delay the init call to the engine.
-    /// Unfortunately, this means that you likely still need a `new()` method or something similar,
-    /// as you have to give the engine an Application object (see `crate::run()`).
-    ///
-    /// TODO: Investigate alternatives to this. Could we have the engine create `Application`? Maybe...
-    #[allow(unused_variables)]
-    fn init(&mut self, ctx: &mut crate::context::EngineContext) {}
+    /// Must be implemented by the user
+    fn new(ctx: &mut crate::context::EngineContext) -> Self;
 
     /// Called once the engine wants to close. For example, you may save information here.
     ///

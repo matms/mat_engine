@@ -4,42 +4,40 @@ use nalgebra_glm as glm;
 
 struct MyApp {
     time: std::time::SystemTime,
-    rend_2d: Option<Renderer2d>,
+    rend_2d: Renderer2d,
     tex_key: ArenaKey,
 }
 
 impl mat_engine::application::Application for MyApp {
-    fn init(&mut self, ctx: &mut mat_engine::context::EngineContext) {
-        //log::warn!("APP INIT!");
-
-        self.time = std::time::SystemTime::now();
+    fn new(ctx: &mut mat_engine::context::EngineContext) -> Self {
+        let time = std::time::SystemTime::now();
 
         ctx.imgui_init();
 
-        self.rend_2d = Some(Renderer2d::new(ctx));
+        let mut rend_2d = Renderer2d::new(ctx);
 
-        self.tex_key = self
-            .rend_2d
-            .as_mut()
-            .unwrap()
-            .create_new_texture_bind_group(
-                ctx,
-                include_bytes!("colorscales.png"),
-                Some("Sample Texture"),
-            );
+        let tex_key = rend_2d.create_new_texture_bind_group(
+            ctx,
+            include_bytes!("colorscales.png"),
+            Some("Sample Texture"),
+        );
+
+        Self {
+            time,
+            rend_2d,
+            tex_key,
+        }
     }
 
     fn update(&mut self, ctx: &mut mat_engine::context::EngineContext) {
         /*
-        self.rend_2d.as_mut().unwrap().camera.mul_scale(0.9998);
+        self.rend_2d.camera.mul_scale(0.9998);
         self.rend_2d
-            .as_mut()
-            .unwrap()
             .camera
             .translate_position(glm::vec2(0.0005, 0.0005));
         */
 
-        self.rend_2d.as_mut().unwrap().update(ctx);
+        self.rend_2d.update(ctx);
 
         mat_engine::imgui::update(ctx);
     }
@@ -56,30 +54,20 @@ impl mat_engine::application::Application for MyApp {
         let mut frt = mat_engine::rendering::start_render(ctx);
 
         self.rend_2d
-            .as_mut()
-            .unwrap()
             .render_sample_texture(ctx, &mut frt, self.tex_key);
 
         let a = glm::vec2(0.0, 30.0);
         log::trace!(
             "A) World coords {:?} correspond to pixel screen coords {:?}",
             a,
-            self.rend_2d
-                .as_mut()
-                .unwrap()
-                .camera
-                .world_to_pixel_screen_coords(&a)
+            self.rend_2d.camera.world_to_pixel_screen_coords(&a)
         );
 
         let b = glm::vec2(512.0, 355.0);
         log::trace!(
             "C) Pixel screen coords {:?} correspond to world coords {:?}",
             b,
-            self.rend_2d
-                .as_mut()
-                .unwrap()
-                .camera
-                .pixel_screen_to_world_coords(&b)
+            self.rend_2d.camera.pixel_screen_to_world_coords(&b)
         );
 
         //Render imgui
@@ -125,9 +113,5 @@ fn main() {
 
     log::trace!("Starting sample_sandbox");
 
-    mat_engine::run(Box::new(MyApp {
-        time: std::time::SystemTime::UNIX_EPOCH,
-        rend_2d: None,
-        tex_key: ArenaKey::default(),
-    }));
+    mat_engine::run::<MyApp>();
 }

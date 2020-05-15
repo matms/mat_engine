@@ -14,7 +14,9 @@ pub use context::EngineContext;
 
 /// Execute a given Application. Doesn't return, use the `Application::close()` method to
 /// gracefully handle shutdown. See module `windowing` for more info.
-pub fn run(mut app: Box<dyn application::Application>) -> ! {
+///
+/// Generic over Application type.
+pub fn run<T: application::Application + 'static>() -> ! {
     log::trace!("Starting mat_engine");
 
     let mut ctx = context::EngineContext::uninit();
@@ -28,7 +30,7 @@ pub fn run(mut app: Box<dyn application::Application>) -> ! {
 
     ctx.rendering_init();
 
-    app.init(&mut ctx);
+    let mut app = Box::new(T::new(&mut ctx));
 
     ev_loop.run(move |event, _, control_flow| {
         // Immediately start the next loop once current is done, instead of waiting
