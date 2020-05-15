@@ -16,7 +16,7 @@ use camera_2d::Camera2d;
 use instance::{Instance, InstanceData};
 use vertex_2d::Vertex2d;
 
-/// Default 2D renderer.
+/// Default 2D renderer component.
 ///
 /// Needs rendering system to be initialized.
 #[allow(dead_code)]

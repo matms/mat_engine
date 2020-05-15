@@ -1,3 +1,27 @@
+//!
+//! # Engine Architecture
+//!
+//! This is a preliminary draft that serves just as much as documentation as it does
+//! orientation (a plan) for development of the engine.
+//!
+//! The engine has fundamentally two different types of resources at the macro level,
+//! *systems*, and *Components*.
+//!
+//! Systems are stored inside the `EngineContext` object, which contains all systems, whether
+//! initialized or uninitialized. An example of a system is `RenderingSystem`. Systems are
+//! reasonably tightly coupled with eachother. Doing something that requires a System to be
+//! initialized when it isn't is likely to panic.
+//!
+//! Components are managed (and owned) by the user application, with the expectation that users will
+//! pick and choose them according to their needs. An example of a component is `Renderer2d`.
+//!
+//! Fundamentally, components depend on and use systems to provide their behaviors, whereas systems
+//! shouldn't depend on components for their behaviors. Components therefore provide a higher level,
+//! more specific, API, focused on a specific need. Using the `Renderer2d` example, we have
+//! a component which depends on systems (see docs for specifics, but, in general, it is likely that
+//! it will always depend on `WindowingSystem` and `RenderingSystem`), to provide for a specific need
+//! (2D rendering).
+
 #[macro_use]
 mod macros;
 mod typedefs;
