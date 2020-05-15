@@ -216,18 +216,28 @@ impl Renderer2d {
 lazy_static::lazy_static! {
     static ref COMPILED_DEFAULT_VERT_SHADER: shaders::Shader = {
         unsafe {
+            let mut path = crate::assets::get_engine_assets_path();
+            path.push("shaders");
+            path.push("rend_2d");
+            path.push("shader.vert");
+
             shaders::compile_glsl_to_spirv(
-                include_str!("shader_files/shader.vert"),
-                "shader.vert",
+                crate::assets::read_file_at_path_to_string(path).expect("Cannot load shader"),
+                "shader.vert".into(),
                 shaders::ShaderType::Vertex)
         }
     };
 
     static ref COMPILED_DEFAULT_FRAG_SHADER: shaders::Shader = {
         unsafe {
+            let mut path = crate::assets::get_engine_assets_path();
+            path.push("shaders");
+            path.push("rend_2d");
+            path.push("shader.frag");
+
             shaders::compile_glsl_to_spirv(
-                include_str!("shader_files/shader.frag"),
-                "shader.frag",
+                crate::assets::read_file_at_path_to_string(path).expect("Cannot load shader"),
+                "shader.frag".into(),
                 shaders::ShaderType::Fragment)
         }
     };

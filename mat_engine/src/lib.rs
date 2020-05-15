@@ -5,7 +5,7 @@
 //! orientation (a plan) for development of the engine.
 //!
 //! The engine has fundamentally two different types of resources at the macro level,
-//! *systems*, and *Components*.
+//! *Systems*, and *Components*.
 //!
 //! Systems are stored inside the `EngineContext` object, which contains all systems, whether
 //! initialized or uninitialized. An example of a system is `RenderingSystem`. Systems are
@@ -29,6 +29,7 @@ mod utils;
 
 pub mod application;
 pub mod arena;
+pub mod assets;
 pub mod context;
 pub mod imgui;
 pub mod rendering;

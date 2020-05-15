@@ -16,9 +16,14 @@ impl mat_engine::application::Application for MyApp {
 
         let mut rend_2d = Renderer2d::new(ctx);
 
+        let mut tex_path = mat_engine::assets::get_folder_assets_path("sample_sandbox");
+        tex_path.push("colorscales.png");
+
         let tex_key = rend_2d.create_new_texture_bind_group(
             ctx,
-            include_bytes!("colorscales.png"),
+            mat_engine::assets::read_file_at_path_to_bytes(tex_path)
+                .unwrap()
+                .as_ref(),
             Some("Sample Texture"),
         );
 
