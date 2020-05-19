@@ -100,8 +100,23 @@ impl RenderingSystem {
     }
 }
 
-impl crate::windowing::ResizeListener for RenderingSystem {
-    fn resize_event(&mut self, new_inner_width: u32, new_inner_height: u32) {
-        self.state.resize(new_inner_width, new_inner_height);
+impl super::event::EventReceiver for RenderingSystem {
+    fn receives_event_type(evt_type: crate::event::types::EventType) -> bool {
+        match evt_type {
+            crate::event::types::EventType::WindowResizeEvent => true,
+            _ => false,
+        }
+    }
+    fn receive_event(ctx: &mut crate::EngineContext, evt: crate::event::Event) {
+        match evt {
+            crate::event::Event::WindowResizeEvent(resize) => match &mut ctx.rendering_system {
+                None => {}
+                Some(rc) => {
+                    rc.state
+                        .resize(resize.new_inner_width, resize.new_inner_height);
+                }
+            },
+            _ => unreachable!("See receives_event_type"),
+        }
     }
 }

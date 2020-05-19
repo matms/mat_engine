@@ -93,7 +93,7 @@ pub fn render(ctx: &mut crate::EngineContext, frt: &mut crate::rendering::FrameR
 /// Note: This may be removed in the future and replaced by an Event System.
 ///
 /// This is a wrapper method.
-pub(crate) fn process_event(
+pub(crate) fn process_winit_event(
     ctx: &mut crate::EngineContext,
     event: &winit::event::Event<crate::windowing::Request>,
 ) {

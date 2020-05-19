@@ -37,20 +37,6 @@ pub(crate) fn make_default_winit_window(
         .expect("Could not obtain winit window")
 }
 
-/// Used to allow systems to be notified whenever the window is resized
-pub(crate) trait ResizeListener {
-    /// Implement to be notified whenever the window is resized*.
-    /// Note that we inform the new INNER size of the window. See winit's docs for more
-    /// info on the INNER x OUTER size dichotomy.
-    ///
-    /// *Note: As a general Event system hasn't yet been implemented, it isn't enough to
-    /// impl the `ResizeListener` trait and this method, you must also modify
-    /// `windowing::notify_resize`.
-    ///
-    /// TODO: Implement general event system
-    fn resize_event(&mut self, new_inner_width: u32, new_inner_height: u32);
-}
-
 pub struct WindowingSystem {
     pub(crate) winit_window: winit::window::Window,
     pub(crate) winit_event_loop_proxy: winit::event_loop::EventLoopProxy<Request>,
@@ -83,22 +69,6 @@ impl WindowingSystem {
     /// See wrapper method `windowing::force_quit()`.
     fn force_quit(&mut self) {
         self.force_quit = true;
-    }
-}
-
-/// Notifies interested systems of a resize event.
-///
-/// TODO: Refactor into better, more general event system.
-pub(crate) fn notify_resize(
-    context: &mut crate::context::EngineContext,
-    new_inner_width: u32,
-    new_inner_height: u32,
-) {
-    match &mut context.rendering_system {
-        None => {}
-        Some(rc) => {
-            rc.resize_event(new_inner_width, new_inner_height);
-        }
     }
 }
 

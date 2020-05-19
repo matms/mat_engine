@@ -86,7 +86,6 @@ impl mat_engine::application::Application for MyApp {
                 .size([300.0, 100.0], imgui::Condition::FirstUseEver)
                 .build(&ui, || {
                     ui.text(imgui::im_str!("Hello world!"));
-                    ui.text(imgui::im_str!("This...is...imgui-rs!"));
                     ui.separator();
                     let mouse_pos = ui.io().mouse_pos;
                     ui.text(format!(

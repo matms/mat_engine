@@ -1,4 +1,6 @@
-use crate::{imgui::ImguiSystem, rendering::RenderingSystem, windowing::WindowingSystem};
+use crate::{
+    event::EventQueue, imgui::ImguiSystem, rendering::RenderingSystem, windowing::WindowingSystem,
+};
 /// "Global" engine state.
 ///
 /// Should probably be used like a singleton. Use of multiple `EngineContexts` is unsupported and untested.
@@ -27,6 +29,8 @@ pub struct EngineContext {
     pub(crate) windowing_system: Option<WindowingSystem>,
     pub(crate) rendering_system: Option<RenderingSystem>,
     pub(crate) imgui_system: Option<ImguiSystem>,
+
+    pub(crate) event_queue: EventQueue,
 }
 
 impl EngineContext {
@@ -36,6 +40,7 @@ impl EngineContext {
             windowing_system: None,
             rendering_system: None,
             imgui_system: None,
+            event_queue: EventQueue::new(),
         }
     }
 

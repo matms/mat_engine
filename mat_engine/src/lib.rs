@@ -31,6 +31,7 @@ pub mod application;
 pub mod arena;
 pub mod assets;
 pub mod context;
+pub mod event;
 pub mod imgui;
 pub mod rendering;
 pub mod windowing;
@@ -46,18 +47,18 @@ pub fn run<T: application::Application + 'static>() -> ! {
 
     let mut ctx = context::EngineContext::uninit();
 
-    let ev_loop = windowing::make_winit_event_loop();
+    let winit_ev_loop = windowing::make_winit_event_loop();
 
     ctx.windowing_init(
-        windowing::make_default_winit_window(&ev_loop),
-        windowing::make_winit_event_loop_proxy(&ev_loop),
+        windowing::make_default_winit_window(&winit_ev_loop),
+        windowing::make_winit_event_loop_proxy(&winit_ev_loop),
     );
 
     ctx.rendering_init();
 
     let mut app = Box::new(T::new(&mut ctx));
 
-    ev_loop.run(move |event, _, control_flow| {
+    winit_ev_loop.run(move |event, _, control_flow| {
         // Immediately start the next loop once current is done, instead of waiting
         // for user input.
         // TODO: This may be useful for frame-rate limiting, I'm unsure. Need to examine.
@@ -102,17 +103,40 @@ pub fn run<T: application::Application + 'static>() -> ! {
                     event: winit::event::WindowEvent::Resized(new_size),
                     ..
                 } => {
-                    windowing::notify_resize(&mut ctx, new_size.width, new_size.height);
+                    // Note that if we don't call process_engine_events, that means this event will
+                    // stay in the queue until that happens.
+                    ctx.event_queue.push_event(event::Event::WindowResizeEvent(
+                        event::events::WindowResizeEvent {
+                            new_inner_width: new_size.width,
+                            new_inner_height: new_size.height,
+                        },
+                    ));
                 }
                 winit::event::Event::WindowEvent {
                     event: winit::event::WindowEvent::ScaleFactorChanged { new_inner_size, .. },
                     ..
                 } => {
-                    windowing::notify_resize(&mut ctx, new_inner_size.width, new_inner_size.height);
+                    // Note that if we don't call process_engine_events, that means this event will
+                    // stay in the queue until that happens.
+                    ctx.event_queue.push_event(event::Event::WindowResizeEvent(
+                        event::events::WindowResizeEvent {
+                            new_inner_width: new_inner_size.width,
+                            new_inner_height: new_inner_size.height,
+                        },
+                    ));
                 }
                 // --------------------------------------------------
                 winit::event::Event::MainEventsCleared => {
+                    log::trace!("winit::event::Event::MainEventsCleared");
+
+                    // Since the Queue is FIFO, process outstanding events, with the last being PreUpdateEvent
+                    ctx.event_queue.push_event(event::Event::PreUpdateEvent);
+                    process_engine_events(&mut ctx, app.as_mut());
+
                     app.update(&mut ctx);
+
+                    ctx.event_queue.push_event(event::Event::PostUpdateEvent);
+                    process_engine_events(&mut ctx, app.as_mut());
 
                     // After `update()`, we want to run `render()`
                     {
@@ -124,7 +148,16 @@ pub fn run<T: application::Application + 'static>() -> ! {
                     }
                 }
                 winit::event::Event::RedrawRequested(_) => {
+                    log::trace!("winit::event::Event::RedrawRequested");
+
+                    // Since the Queue is FIFO, process outstanding events, with the last being PreUpdateEvent
+                    ctx.event_queue.push_event(event::Event::PreRenderEvent);
+                    process_engine_events(&mut ctx, app.as_mut());
+
                     app.render(&mut ctx);
+
+                    ctx.event_queue.push_event(event::Event::PostRenderEvent);
+                    process_engine_events(&mut ctx, app.as_mut());
                 }
                 winit::event::Event::LoopDestroyed => {
                     unreachable!("Should be handled by if let");
@@ -138,7 +171,7 @@ pub fn run<T: application::Application + 'static>() -> ! {
             }
 
             // Additional code that must be run for every event (excepting corner cases involving quitting).
-            process_event(&mut ctx, &event);
+            process_winit_event(&mut ctx, &event);
         }
     })
 }
@@ -146,14 +179,26 @@ pub fn run<T: application::Application + 'static>() -> ! {
 /// Event post-processor: Code that should be run for every* event should go here
 ///
 /// *(except for `winit::event::Event::LoopDestroyed`)
-fn process_event(
+fn process_winit_event(
     ctx: &mut context::EngineContext,
     event: &winit::event::Event<crate::windowing::Request>,
 ) {
     match &ctx.imgui_system {
         None => {}
         Some(_) => {
-            imgui::process_event(ctx, event);
+            imgui::process_winit_event(ctx, event);
         }
+    }
+}
+
+fn process_engine_events<T: application::Application>(
+    ctx: &mut context::EngineContext,
+    app: &mut T,
+) {
+    while let Some(evt) = ctx.event_queue.retrieve_event() {
+        event::inform_receiver::<event::DebugEventReceiver>(ctx, evt);
+
+        // For now only the rendering system is listening to events
+        event::inform_receiver::<rendering::RenderingSystem>(ctx, evt);
     }
 }
