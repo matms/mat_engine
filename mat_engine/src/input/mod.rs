@@ -5,10 +5,12 @@ use std::collections::HashMap;
 
 /// Must be called by the user once they finish reading input.
 ///
-/// I would advise that you do all input reading in a single step (e.g, do it all inside
-/// the update method), though it isn't strictly required. Calling this method at inappropriate times may
-/// lead to inputs being registered "to the wrong frame", so to speak, possibly causing issues
-/// with is_button_pressed(). Should, therefore, be called by the same function that actually reads the input.
+/// I would advise that you do all input reading (at least, that which pertains
+/// to things that necessitate keeping track of frames --- for now buttons only) in a single step
+/// (e.g, do it all inside the update method), though it isn't strictly required. Calling this method
+/// at inappropriate times may lead to inputs being registered "to the wrong frame", so to speak, possibly
+/// causing issues with is_button_pressed(). Should, therefore, be called by the same function that actually
+/// reads the input.
 ///
 /// This causes the frame to advance,
 /// which plays a role in controlling single click events (i.e things that should happen once

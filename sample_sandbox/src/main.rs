@@ -1,4 +1,4 @@
-use mat_engine::{arena::ArenaKey, rendering::rend_2d::Renderer2d};
+use mat_engine::{arena::ArenaKey, input::button::ButtonId, rendering::rend_2d::Renderer2d};
 
 use nalgebra_glm as glm;
 
@@ -59,18 +59,26 @@ impl mat_engine::application::Application for MyApp {
             .translate_position(glm::vec2(0.0005, 0.0005));
         */
 
-        if mat_engine::input::is_button_down(ctx, &mat_engine::input::button::ButtonId::MOUSE_LEFT)
-        {
-            self.rend_2d.camera.mul_scale(0.998);
+        let cam = &mut self.rend_2d.camera;
+
+        if mat_engine::input::is_button_pressed(ctx, &ButtonId::Q) {
+            cam.mul_scale(1.1);
+        }
+        if mat_engine::input::is_button_pressed(ctx, &ButtonId::E) {
+            cam.mul_scale(0.9);
         }
 
-        if mat_engine::input::is_button_pressed(
-            ctx,
-            &mat_engine::input::button::ButtonId::MOUSE_RIGHT,
-        ) {
-            self.rend_2d
-                .camera
-                .translate_position(glm::vec2(10.0, 10.0))
+        if mat_engine::input::is_button_down(ctx, &ButtonId::A) {
+            cam.translate_position(glm::vec2(-1.0, 0.0))
+        }
+        if mat_engine::input::is_button_down(ctx, &ButtonId::D) {
+            cam.translate_position(glm::vec2(1.0, 0.0))
+        }
+        if mat_engine::input::is_button_down(ctx, &ButtonId::W) {
+            cam.translate_position(glm::vec2(0.0, 1.0))
+        }
+        if mat_engine::input::is_button_down(ctx, &ButtonId::S) {
+            cam.translate_position(glm::vec2(0.0, -1.0))
         }
 
         // We mustn't forget this...
@@ -114,6 +122,8 @@ impl mat_engine::application::Application for MyApp {
         // Copy dur (Duration is a Copy type).
         let _dur = dur;
 
+        let input_sys_mouse_info = mat_engine::input::cursor::get_cursor_info(ctx);
+
         mat_engine::imgui::add_render_fn(ctx, move |ui| {
             // See https://github.com/Gekkio/imgui-rs
             imgui::Window::new(imgui::im_str!("Hello world"))
@@ -125,6 +135,10 @@ impl mat_engine::application::Application for MyApp {
                     ui.text(format!(
                         "Mouse Position: ({:.1},{:.1})",
                         mouse_pos[0], mouse_pos[1]
+                    ));
+                    ui.text(format!(
+                        "Input system mouse info: {:?}",
+                        input_sys_mouse_info
                     ));
                     ui.separator();
                     ui.text(format!("Last frame duration: {}us.", _dur.as_micros()));
