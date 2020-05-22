@@ -162,39 +162,39 @@ impl InputSystem {
                 );
             }
             winit::event::WindowEvent::DroppedFile(_) => {
-                log::warn!("Input System: Currently unsupported event DroppedFile");
+                // log::warn!("Input System: Currently unsupported event DroppedFile");
             }
             winit::event::WindowEvent::HoveredFile(_) => {
-                log::warn!("Input System: Currently unsupported event HoveredFile");
+                // log::warn!("Input System: Currently unsupported event HoveredFile");
             }
             winit::event::WindowEvent::HoveredFileCancelled => {
-                log::warn!("Input System: Currently unsupported event HoveredFileCancelled");
+                // log::warn!("Input System: Currently unsupported event HoveredFileCancelled");
             }
             winit::event::WindowEvent::Touch(_) => {
-                log::warn!("Input System: Currently unsupported event Touch");
+                // log::warn!("Input System: Currently unsupported event Touch");
             }
             // TODO: Should this be handled by input or windowing?
             winit::event::WindowEvent::Focused(_) => {
                 log::warn!("Input System: Currently unsupported event HoveredFileCancelled");
             }
             winit::event::WindowEvent::TouchpadPressure { .. } => {
-                log::warn!("Input System: Currently unsupported event TouchpadPressure");
+                // log::warn!("Input System: Currently unsupported event TouchpadPressure");
             }
             winit::event::WindowEvent::AxisMotion { .. } => {
-                log::warn!("Input System: Currently unsupported event AxisMotion");
+                // log::warn!("Input System: Currently unsupported event AxisMotion");
             }
-            winit::event::WindowEvent::ReceivedCharacter(char) => {
-                log::warn!("Input System: Currently unsupported event ReceivedCharacter");
+            winit::event::WindowEvent::ReceivedCharacter(_char) => {
+                // log::warn!("Input System: Currently unsupported event ReceivedCharacter");
             }
             // The actual interesting code should be here...
             winit::event::WindowEvent::CursorMoved { position, .. } => {
                 self.cursor_pos.x = position.x;
                 self.cursor_pos.y = position.y;
             }
-            winit::event::WindowEvent::CursorEntered { device_id } => {
+            winit::event::WindowEvent::CursorEntered { .. } => {
                 self.cursor_state = cursor::CursorState::InsideScreen;
             }
-            winit::event::WindowEvent::CursorLeft { device_id } => {
+            winit::event::WindowEvent::CursorLeft { .. } => {
                 self.cursor_state = cursor::CursorState::OutsideScreen;
             }
             winit::event::WindowEvent::ModifiersChanged(modifiers) => {
@@ -230,12 +230,7 @@ impl InputSystem {
                     self.handle_winit_button_input(vk, input.state);
                 }
             }
-            winit::event::WindowEvent::MouseInput {
-                device_id,
-                state,
-                button,
-                ..
-            } => {
+            winit::event::WindowEvent::MouseInput { state, button, .. } => {
                 let k = self::button::ButtonId::MouseButton(match button {
                     winit::event::MouseButton::Left => self::button::MouseButtonId::Left,
                     winit::event::MouseButton::Right => self::button::MouseButtonId::Right,
@@ -247,12 +242,7 @@ impl InputSystem {
 
                 self.handle_winit_button_input(k, *state);
             }
-            winit::event::WindowEvent::MouseWheel {
-                device_id,
-                delta,
-                phase,
-                ..
-            } => {
+            winit::event::WindowEvent::MouseWheel { delta, phase, .. } => {
                 log::trace!(
                     "TODO handle properly... MouseWheel... delta: {:?}; phase: {:?}",
                     delta,
