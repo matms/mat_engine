@@ -30,6 +30,7 @@ impl Event {
     }
 }
 
+/// Internal engine systems only
 pub trait EventReceiver {
     fn receives_event_type(evt_type: types::EventType) -> bool;
 
@@ -37,11 +38,27 @@ pub trait EventReceiver {
     fn receive_event(ctx: &mut crate::EngineContext, evt: Event);
 }
 
+pub trait ApplicationEventReceiver {
+    fn receives_event_type(evt_type: types::EventType) -> bool {
+        false
+    }
+
+    /// Will be called iff `receives_event_type()` returns true for the event's type
+    fn receive_event(&mut self, ctx: &mut crate::EngineContext, evt: Event) {}
+}
+
 /// Calls receive_event iff `receives_event_type` is true.
 pub(super) fn inform_receiver<T: EventReceiver>(ctx: &mut crate::EngineContext, evt: Event) {
     if T::receives_event_type(evt.event_type()) {
         T::receive_event(ctx, evt)
     }
+}
+
+pub(super) fn inform_application<T: super::application::Application>(
+    app: &mut T,
+    ctx: &mut crate::EngineContext,
+    evt: Event,
+) {
 }
 
 /// FIFO Queue of engine events. Not to be used for user events

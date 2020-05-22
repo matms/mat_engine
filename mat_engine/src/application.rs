@@ -18,7 +18,7 @@
 ///
 /// TODO: Investigate whether to simulate some sort of event_poll() system, or use
 /// handle_event.
-pub trait Application {
+pub trait Application: super::event::ApplicationEventReceiver {
     /// Creates the Application object.
     ///
     /// Must be implemented by the user

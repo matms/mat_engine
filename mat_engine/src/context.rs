@@ -1,5 +1,6 @@
 use crate::{
-    event::EventQueue, imgui::ImguiSystem, rendering::RenderingSystem, windowing::WindowingSystem,
+    event::EventQueue, imgui::ImguiSystem, input::InputSystem, rendering::RenderingSystem,
+    windowing::WindowingSystem,
 };
 /// "Global" engine state.
 ///
@@ -29,6 +30,7 @@ pub struct EngineContext {
     pub(crate) windowing_system: Option<WindowingSystem>,
     pub(crate) rendering_system: Option<RenderingSystem>,
     pub(crate) imgui_system: Option<ImguiSystem>,
+    pub(crate) input_system: Option<InputSystem>,
 
     pub(crate) event_queue: EventQueue,
 }
@@ -37,11 +39,17 @@ impl EngineContext {
     /// Returns a new, "empty" `EngineContext` with all systems uninitialized.
     pub(crate) fn uninit() -> Self {
         Self {
+            input_system: None,
             windowing_system: None,
             rendering_system: None,
             imgui_system: None,
             event_queue: EventQueue::new(),
         }
+    }
+
+    /// Automatically called, therefore isn't exported to users of crate.
+    pub(crate) fn input_init(&mut self) {
+        self.input_system = Some(InputSystem::new())
     }
 
     /// Automatically called, therefore isn't exported to users of crate.

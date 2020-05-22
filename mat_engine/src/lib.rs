@@ -33,6 +33,7 @@ pub mod assets;
 pub mod context;
 pub mod event;
 pub mod imgui;
+pub mod input;
 pub mod rendering;
 pub mod windowing;
 
@@ -48,6 +49,8 @@ pub fn run<T: application::Application + 'static>() -> ! {
     let mut ctx = context::EngineContext::uninit();
 
     let winit_ev_loop = windowing::make_winit_event_loop();
+
+    ctx.input_init();
 
     ctx.windowing_init(
         windowing::make_default_winit_window(&winit_ev_loop),
@@ -87,43 +90,55 @@ pub fn run<T: application::Application + 'static>() -> ! {
                         }
                     };
                 }
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::CloseRequested,
-                    ..
-                } => {
-                    // goes to winit::event::Event::LoopDestroyed, after processing
-                    // queued/outstanding events
-                    *control_flow = winit::event_loop::ControlFlow::Exit;
+                // Currently we ignore the window id, is this a problem???
+                winit::event::Event::WindowEvent { event, .. } => {
+                    match event {
+                        winit::event::WindowEvent::CloseRequested => {
+                            // goes to winit::event::Event::LoopDestroyed, after processing
+                            // queued/outstanding events
+                            *control_flow = winit::event_loop::ControlFlow::Exit;
+                        }
+                        winit::event::WindowEvent::Resized(new_size) => {
+                            // Note that if we don't call process_engine_events, that means this event will
+                            // stay in the queue until that happens.
+                            ctx.event_queue.push_event(event::Event::WindowResizeEvent(
+                                event::events::WindowResizeEvent {
+                                    new_inner_width: new_size.width,
+                                    new_inner_height: new_size.height,
+                                },
+                            ));
+                        }
+                        winit::event::WindowEvent::ScaleFactorChanged {
+                            new_inner_size, ..
+                        } => {
+                            // Note that if we don't call process_engine_events, that means this event will
+                            // stay in the queue until that happens.
+                            ctx.event_queue.push_event(event::Event::WindowResizeEvent(
+                                event::events::WindowResizeEvent {
+                                    new_inner_width: new_inner_size.width,
+                                    new_inner_height: new_inner_size.height,
+                                },
+                            ));
+                        }
+                        ignored @ winit::event::WindowEvent::ThemeChanged(_)
+                        | ignored @ winit::event::WindowEvent::Moved(_)
+                        | ignored @ winit::event::WindowEvent::Destroyed => {
+                            log::trace!("Ignored windowing event {:?}", ignored);
+                        }
+                        // Input events
+                        input_evt => {
+                            ctx.input_system
+                                .as_mut()
+                                .unwrap()
+                                .receive_winit_windowing_event(input_evt);
+                        }
+                    };
                 }
-                // --------------------------------------------------
-                // +----------+
-                // | RESIZING |
-                // +----------+
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::Resized(new_size),
-                    ..
-                } => {
-                    // Note that if we don't call process_engine_events, that means this event will
-                    // stay in the queue until that happens.
-                    ctx.event_queue.push_event(event::Event::WindowResizeEvent(
-                        event::events::WindowResizeEvent {
-                            new_inner_width: new_size.width,
-                            new_inner_height: new_size.height,
-                        },
-                    ));
-                }
-                winit::event::Event::WindowEvent {
-                    event: winit::event::WindowEvent::ScaleFactorChanged { new_inner_size, .. },
-                    ..
-                } => {
-                    // Note that if we don't call process_engine_events, that means this event will
-                    // stay in the queue until that happens.
-                    ctx.event_queue.push_event(event::Event::WindowResizeEvent(
-                        event::events::WindowResizeEvent {
-                            new_inner_width: new_inner_size.width,
-                            new_inner_height: new_inner_size.height,
-                        },
-                    ));
+                winit::event::Event::DeviceEvent { device_id, event } => {
+                    ctx.input_system
+                        .as_mut()
+                        .unwrap()
+                        .receive_winit_device_event(event);
                 }
                 // --------------------------------------------------
                 winit::event::Event::MainEventsCleared => {
@@ -166,7 +181,7 @@ pub fn run<T: application::Application + 'static>() -> ! {
                 // See winit docs for list of all possible events, and their meanings.
                 // https://docs.rs/winit/0.22.1/winit/event/enum.Event.html
                 _other => {
-                    //log::trace!("Winit misc. event: {:?}", other);
+                    log::trace!("Winit misc. event: {:?}", _other);
                 }
             }
 
@@ -176,7 +191,7 @@ pub fn run<T: application::Application + 'static>() -> ! {
     })
 }
 
-/// Event post-processor: Code that should be run for every* event should go here
+/// Event post-processor: Code that should be run for every* winit event should go here
 ///
 /// *(except for `winit::event::Event::LoopDestroyed`)
 fn process_winit_event(
@@ -196,9 +211,12 @@ fn process_engine_events<T: application::Application>(
     app: &mut T,
 ) {
     while let Some(evt) = ctx.event_queue.retrieve_event() {
-        event::inform_receiver::<event::DebugEventReceiver>(ctx, evt);
+        //event::inform_receiver::<event::DebugEventReceiver>(ctx, evt);
 
         // For now only the rendering system is listening to events
         event::inform_receiver::<rendering::RenderingSystem>(ctx, evt);
+
+        // After all systems are informed of an event, inform the App
+        event::inform_application(app, ctx, evt);
     }
 }

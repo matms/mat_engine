@@ -8,6 +8,23 @@ struct MyApp {
     tex_key: ArenaKey,
 }
 
+/// Note that while we may emit events for a lot of things, events are not the only way to be informed about things.
+/// You should also note that some systems (will) offer polling (like the input system, once it is implemented).
+impl mat_engine::event::ApplicationEventReceiver for MyApp {
+    fn receives_event_type(evt_type: mat_engine::event::types::EventType) -> bool {
+        match evt_type {
+            _ => false,
+        }
+    }
+    fn receive_event(
+        &mut self,
+        ctx: &mut mat_engine::EngineContext,
+        evt: mat_engine::event::Event,
+    ) {
+        unreachable!();
+    }
+}
+
 impl mat_engine::application::Application for MyApp {
     fn new(ctx: &mut mat_engine::context::EngineContext) -> Self {
         let time = std::time::SystemTime::now();
@@ -42,6 +59,23 @@ impl mat_engine::application::Application for MyApp {
             .translate_position(glm::vec2(0.0005, 0.0005));
         */
 
+        if mat_engine::input::is_button_down(ctx, &mat_engine::input::button::ButtonId::MOUSE_LEFT)
+        {
+            self.rend_2d.camera.mul_scale(0.998);
+        }
+
+        if mat_engine::input::is_button_pressed(
+            ctx,
+            &mat_engine::input::button::ButtonId::MOUSE_RIGHT,
+        ) {
+            self.rend_2d
+                .camera
+                .translate_position(glm::vec2(10.0, 10.0))
+        }
+
+        // We mustn't forget this...
+        mat_engine::input::finished_reading_input(ctx);
+
         self.rend_2d.update(ctx);
 
         mat_engine::imgui::update(ctx);
@@ -62,18 +96,18 @@ impl mat_engine::application::Application for MyApp {
             .render_sample_texture(ctx, &mut frt, self.tex_key);
 
         let a = glm::vec2(0.0, 30.0);
-        log::trace!(
+        /*log::trace!(
             "A) World coords {:?} correspond to pixel screen coords {:?}",
             a,
             self.rend_2d.camera.world_to_pixel_screen_coords(&a)
-        );
+        );*/
 
         let b = glm::vec2(512.0, 355.0);
-        log::trace!(
+        /*log::trace!(
             "C) Pixel screen coords {:?} correspond to world coords {:?}",
             b,
             self.rend_2d.camera.pixel_screen_to_world_coords(&b)
-        );
+        );*/
 
         //Render imgui
 
