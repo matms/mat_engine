@@ -16,6 +16,8 @@ pub enum Event {
     PreRenderEvent,
     /// Called just after `Application::render()`
     PostRenderEvent,
+    /// Called right at the beginning of a frame (really, a winit loop), before any other events.
+    Start,
 }
 
 impl Event {
@@ -26,6 +28,7 @@ impl Event {
             Event::PostUpdateEvent => types::EventType::PostUpdateEvent,
             Event::PreRenderEvent => types::EventType::PreRenderEvent,
             Event::PostRenderEvent => types::EventType::PostRenderEvent,
+            Event::Start => types::EventType::StartEvent,
         }
     }
 }
@@ -82,6 +85,10 @@ impl EventQueue {
     /// Returns None if there are no events in the queue.
     pub(crate) fn retrieve_event(&mut self) -> Option<Event> {
         self.queue.pop_front()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.queue.is_empty()
     }
 }
 

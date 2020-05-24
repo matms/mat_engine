@@ -3,7 +3,6 @@ use mat_engine::{arena::ArenaKey, input::button::ButtonId, rendering::rend_2d::R
 use nalgebra_glm as glm;
 
 struct MyApp {
-    time: std::time::SystemTime,
     rend_2d: Renderer2d,
     tex_key: ArenaKey,
 }
@@ -16,6 +15,7 @@ impl mat_engine::event::ApplicationEventReceiver for MyApp {
             _ => false,
         }
     }
+    #[allow(unused_variables)]
     fn receive_event(
         &mut self,
         ctx: &mut mat_engine::EngineContext,
@@ -27,8 +27,6 @@ impl mat_engine::event::ApplicationEventReceiver for MyApp {
 
 impl mat_engine::application::Application for MyApp {
     fn new(ctx: &mut mat_engine::context::EngineContext) -> Self {
-        let time = std::time::SystemTime::now();
-
         ctx.imgui_init();
 
         let mut rend_2d = Renderer2d::new(ctx);
@@ -44,11 +42,7 @@ impl mat_engine::application::Application for MyApp {
             Some("Sample Texture"),
         );
 
-        Self {
-            time,
-            rend_2d,
-            tex_key,
-        }
+        Self { rend_2d, tex_key }
     }
 
     fn update(&mut self, ctx: &mut mat_engine::context::EngineContext) {
@@ -81,48 +75,33 @@ impl mat_engine::application::Application for MyApp {
             cam.translate_position(glm::vec2(0.0, -1.0))
         }
 
-        // We mustn't forget this...
-        mat_engine::input::finished_reading_input(ctx);
-
         self.rend_2d.update(ctx);
 
         mat_engine::imgui::update(ctx);
     }
 
     fn render(&mut self, ctx: &mut mat_engine::context::EngineContext) {
-        let new_time = std::time::SystemTime::now();
-        let dur = new_time
-            .duration_since(self.time)
-            .expect("System time progressed non-monotonically, I think");
-
-        self.time = new_time;
-
         //log::warn!("RENDER START");
         let mut frt = mat_engine::rendering::start_render(ctx);
 
         self.rend_2d
             .render_sample_texture(ctx, &mut frt, self.tex_key);
 
-        let a = glm::vec2(0.0, 30.0);
-        /*log::trace!(
-            "A) World coords {:?} correspond to pixel screen coords {:?}",
-            a,
-            self.rend_2d.camera.world_to_pixel_screen_coords(&a)
-        );*/
-
-        let b = glm::vec2(512.0, 355.0);
-        /*log::trace!(
-            "C) Pixel screen coords {:?} correspond to world coords {:?}",
-            b,
-            self.rend_2d.camera.pixel_screen_to_world_coords(&b)
-        );*/
-
         //Render imgui
 
-        // Copy dur (Duration is a Copy type).
-        let _dur = dur;
-
         let input_sys_mouse_info = mat_engine::input::cursor::get_cursor_info(ctx);
+
+        let (_, mouse_pos) = input_sys_mouse_info;
+
+        let mut coordinate_info = String::from("Mouse outside screen, probably.");
+
+        let delta = mat_engine::chrono::delta_time(ctx);
+
+        if let Some(mouse_pos) = mouse_pos {
+            let v: glm::Vec2 = glm::vec2(mouse_pos.x as f32, mouse_pos.y as f32);
+            let w: glm::Vec2 = self.rend_2d.camera.pixel_screen_to_world_coords(&v);
+            coordinate_info = format!("Screen coords {:?} correspond to world coords {:?}.", v, w);
+        }
 
         mat_engine::imgui::add_render_fn(ctx, move |ui| {
             // See https://github.com/Gekkio/imgui-rs
@@ -140,8 +119,9 @@ impl mat_engine::application::Application for MyApp {
                         "Input system mouse info: {:?}",
                         input_sys_mouse_info
                     ));
+                    ui.text(coordinate_info.clone());
                     ui.separator();
-                    ui.text(format!("Last frame duration: {}us.", _dur.as_micros()));
+                    ui.text(format!("Delta: {:.2}us", delta * 1_000_000.0));
                 });
 
             //ui.show_demo_window(&mut false);

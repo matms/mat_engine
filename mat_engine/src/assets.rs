@@ -29,6 +29,8 @@ fn calculate_top_path() -> PathBuf {
         p.pop();
 
         p
+    } else if p.file_name().unwrap().to_str().unwrap() == "test_rel" {
+        p
     } else {
         log::error!(
             "We don't know where the relevant folders are relative \

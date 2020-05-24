@@ -1,6 +1,6 @@
 use crate::{
-    event::EventQueue, imgui::ImguiSystem, input::InputSystem, rendering::RenderingSystem,
-    windowing::WindowingSystem,
+    chrono::ChronoSystem, event::EventQueue, imgui::ImguiSystem, input::InputSystem,
+    rendering::RenderingSystem, windowing::WindowingSystem,
 };
 /// "Global" engine state.
 ///
@@ -27,6 +27,7 @@ use crate::{
 /// To access systems conveniently, use `utils::unwrap_ref()` and `utils::unwrap_mut()`
 /// Be warned that they panic if the system is not initialized.
 pub struct EngineContext {
+    pub(crate) chrono_system: Option<ChronoSystem>,
     pub(crate) windowing_system: Option<WindowingSystem>,
     pub(crate) rendering_system: Option<RenderingSystem>,
     pub(crate) imgui_system: Option<ImguiSystem>,
@@ -39,6 +40,7 @@ impl EngineContext {
     /// Returns a new, "empty" `EngineContext` with all systems uninitialized.
     pub(crate) fn uninit() -> Self {
         Self {
+            chrono_system: None,
             input_system: None,
             windowing_system: None,
             rendering_system: None,
@@ -48,8 +50,13 @@ impl EngineContext {
     }
 
     /// Automatically called, therefore isn't exported to users of crate.
+    pub(crate) fn chrono_init(&mut self) {
+        self.chrono_system = Some(ChronoSystem::new());
+    }
+
+    /// Automatically called, therefore isn't exported to users of crate.
     pub(crate) fn input_init(&mut self) {
-        self.input_system = Some(InputSystem::new())
+        self.input_system = Some(InputSystem::new());
     }
 
     /// Automatically called, therefore isn't exported to users of crate.

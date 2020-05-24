@@ -6,4 +6,5 @@ pub enum EventType {
     PostUpdateEvent,
     PreRenderEvent,
     PostRenderEvent,
+    StartEvent,
 }

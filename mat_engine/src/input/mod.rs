@@ -3,22 +3,6 @@ pub mod cursor;
 use crate::utils::unwrap_mut;
 use std::collections::HashMap;
 
-/// Must be called by the user once they finish reading input.
-///
-/// I would advise that you do all input reading (at least, that which pertains
-/// to things that necessitate keeping track of frames --- for now buttons only) in a single step
-/// (e.g, do it all inside the update method), though it isn't strictly required. Calling this method
-/// at inappropriate times may lead to inputs being registered "to the wrong frame", so to speak, possibly
-/// causing issues with is_button_pressed(). Should, therefore, be called by the same function that actually
-/// reads the input.
-///
-/// This causes the frame to advance,
-/// which plays a role in controlling single click events (i.e things that should happen once
-/// per press/release cycle), irrespective of how long the key is held down.
-pub fn finished_reading_input(ctx: &mut crate::EngineContext) {
-    unwrap_mut(&mut ctx.input_system).start_new_frame()
-}
-
 /// Returns true iff the button is down (i.e was pressed this frame or is being held).
 pub fn is_button_down(ctx: &mut crate::EngineContext, button_id: &button::ButtonId) -> bool {
     let state = unwrap_mut(&mut ctx.input_system).button_state_or_default(button_id);
@@ -31,9 +15,6 @@ pub fn is_button_down(ctx: &mut crate::EngineContext, button_id: &button::Button
 
 /// Returns true iff the button was pressed THIS SPECIFIC FRAME, but false for all other frames if the user
 /// continues to hold it down.
-///
-/// Important note: See `finished_reading_input()`
-/// (You must call it, and do so correctly, for this method to work correctly).
 pub fn is_button_pressed(ctx: &mut crate::EngineContext, button_id: &button::ButtonId) -> bool {
     let curr_frame = unwrap_mut(&mut ctx.input_system).frame_count;
     let state = unwrap_mut(&mut ctx.input_system).button_state_or_default(button_id);
@@ -102,8 +83,16 @@ impl InputSystem {
             .unwrap_or(&button::ButtonState::Up { change_frame: 0 })
     }
 
+    /// Since engine event Start (winit event NewEvents) is always the first event emitted in a "frame",
+    /// followed by inputs, then only after all inputs is Update (winit event MainEventsCleared) called,
+    /// this means it should be safe to update the frame counter at Start and depend on it being the same
+    /// for all relevant inputs, and also the same at the time the inputs are processed (assuming the user
+    /// calls this module's input reading functions inside `Application::update()`).
+    /// This function should therefore be called by the event handler for engine event Start
+    /// (see `EventReceiver` impl for `InputSystem`).
     fn start_new_frame(&mut self) {
         self.frame_count += 1;
+        //log::trace!("start_new_frame {:?}", self.frame_count);
     }
 
     fn handle_winit_button_input(
@@ -175,7 +164,7 @@ impl InputSystem {
             }
             // TODO: Should this be handled by input or windowing?
             winit::event::WindowEvent::Focused(_) => {
-                log::warn!("Input System: Currently unsupported event HoveredFileCancelled");
+                // log::warn!("Input System: Currently unsupported event Focused");
             }
             winit::event::WindowEvent::TouchpadPressure { .. } => {
                 // log::warn!("Input System: Currently unsupported event TouchpadPressure");
@@ -253,23 +242,23 @@ impl InputSystem {
     }
 
     pub(crate) fn receive_winit_device_event(&mut self, evt: &winit::event::DeviceEvent) {
-        log::trace!("TODO!")
+        log::trace!(
+            "Input system received device event but didn't process it: {:?}",
+            evt
+        );
     }
 }
 
 impl crate::event::EventReceiver for InputSystem {
     fn receives_event_type(evt_type: crate::event::types::EventType) -> bool {
         match evt_type {
-            crate::event::types::EventType::PostRenderEvent => true,
+            crate::event::types::EventType::StartEvent => true,
             _ => false,
         }
     }
     fn receive_event(ctx: &mut crate::EngineContext, evt: crate::event::Event) {
         match evt {
-            // TODO: Maybe replace this for sth else (investigate NewEvents)
-            crate::event::Event::PostRenderEvent => {
-                unwrap_mut(&mut ctx.input_system).start_new_frame()
-            }
+            crate::event::Event::Start => unwrap_mut(&mut ctx.input_system).start_new_frame(),
             _ => unreachable!(),
         }
     }

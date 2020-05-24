@@ -119,6 +119,10 @@ impl Renderer2d {
                 position: nalgebra_glm::vec2(0.0, 30.0),
                 scale: 20.0,
             },
+            Instance {
+                position: nalgebra_glm::vec2(100.0, 100.0),
+                scale: 5.0,
+            },
         ];
 
         // BUFFERS

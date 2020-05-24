@@ -30,6 +30,7 @@ mod utils;
 pub mod application;
 pub mod arena;
 pub mod assets;
+pub mod chrono;
 pub mod context;
 pub mod event;
 pub mod imgui;
@@ -39,16 +40,23 @@ pub mod windowing;
 
 pub use context::EngineContext;
 
+const DEBUG_TRACE_ENGINE_START_AND_END: bool = false;
+const DEBUG_TRACE_EVENT_LOOP_STEPS: bool = false;
+
 /// Execute a given Application. Doesn't return, use the `Application::close()` method to
 /// gracefully handle shutdown. See module `windowing` for more info.
 ///
 /// Generic over Application type.
 pub fn run<T: application::Application + 'static>() -> ! {
-    log::trace!("Starting mat_engine");
+    if DEBUG_TRACE_ENGINE_START_AND_END {
+        log::trace!("Starting mat_engine");
+    }
 
     let mut ctx = context::EngineContext::uninit();
 
     let winit_ev_loop = windowing::make_winit_event_loop();
+
+    ctx.chrono_init();
 
     ctx.input_init();
 
@@ -70,7 +78,9 @@ pub fn run<T: application::Application + 'static>() -> ! {
         // If the application is to be closed, we may skip everything below, and just quit.
         if let winit::event::Event::LoopDestroyed = event {
             app.close(&mut ctx);
-            log::trace!("Ending mat_engine");
+            if DEBUG_TRACE_ENGINE_START_AND_END {
+                log::trace!("Ending mat_engine");
+            }
         // Even when we set *control_flow to Exit, winit still wants to go through the
         // outstanding events. If we wish to skip this, we can use force_quit to ignore
         // all the events until the quitting actually occurs.
@@ -79,7 +89,12 @@ pub fn run<T: application::Application + 'static>() -> ! {
             *control_flow = winit::event_loop::ControlFlow::Exit;
         // Normal event handling loop
         } else {
-            // Handle events by type
+            // Handle winit events by type
+            //
+            // Cycle:
+            //
+            // START (NewEvents) -> Main events... -> UPDATE (MainEventsCleared) -> RENDER (RedrawRequested)
+            // -> Post render step (RedrawEventsCleared) -> Loop again;
             match &event {
                 winit::event::Event::UserEvent(request) => {
                     match request {
@@ -140,9 +155,32 @@ pub fn run<T: application::Application + 'static>() -> ! {
                         .unwrap()
                         .receive_winit_device_event(event);
                 }
-                // --------------------------------------------------
+
+                // +-------+
+                // | START |
+                // +-------+
+                winit::event::Event::NewEvents(_) => {
+                    if DEBUG_TRACE_EVENT_LOOP_STEPS {
+                        log::trace!("*** Start of Frame - after this, will run main events - winit NewEvents");
+                    }
+
+                    ctx.chrono_system.as_mut().unwrap().start_new_frame();
+
+                    // If the queue isn't empty here, we made a serious mistake somewhere.
+                    //
+                    // Ensures events don't persist across frames.
+                    assert!(ctx.event_queue.is_empty());
+                    ctx.event_queue.push_event(event::Event::Start);
+                    process_engine_events(&mut ctx, app.as_mut());
+                }
+
+                // +--------+
+                // | UPDATE |
+                // +--------+
                 winit::event::Event::MainEventsCleared => {
-                    log::trace!("winit::event::Event::MainEventsCleared");
+                    if DEBUG_TRACE_EVENT_LOOP_STEPS {
+                        log::trace!("*** Finished main events, now running UPDATE - winit MainEventsCleared");
+                    }
 
                     // Since the Queue is FIFO, process outstanding events, with the last being PreUpdateEvent
                     ctx.event_queue.push_event(event::Event::PreUpdateEvent);
@@ -162,8 +200,13 @@ pub fn run<T: application::Application + 'static>() -> ! {
                             .request_redraw();
                     }
                 }
+                // +--------+
+                // | RENDER |
+                // +--------+
                 winit::event::Event::RedrawRequested(_) => {
-                    log::trace!("winit::event::Event::RedrawRequested");
+                    if DEBUG_TRACE_EVENT_LOOP_STEPS {
+                        log::trace!("*** Finished UPDATE, now running RENDER - winit RedrawRequested");
+                    }
 
                     // Since the Queue is FIFO, process outstanding events, with the last being PreUpdateEvent
                     ctx.event_queue.push_event(event::Event::PreRenderEvent);
@@ -173,6 +216,12 @@ pub fn run<T: application::Application + 'static>() -> ! {
 
                     ctx.event_queue.push_event(event::Event::PostRenderEvent);
                     process_engine_events(&mut ctx, app.as_mut());
+                }
+                winit::event::Event::RedrawEventsCleared => {
+                    if DEBUG_TRACE_EVENT_LOOP_STEPS {
+                        log::trace!("*** Finished RENDER - winit RedrawEventsCleared");
+                    }
+                    // No need for any behavior here.
                 }
                 winit::event::Event::LoopDestroyed => {
                     unreachable!("Should be handled by if let");
@@ -215,8 +264,11 @@ fn process_engine_events<T: application::Application>(
 
         // For now only the rendering system is listening to events
         event::inform_receiver::<rendering::RenderingSystem>(ctx, evt);
+        event::inform_receiver::<input::InputSystem>(ctx, evt);
 
-        // After all systems are informed of an event, inform the App
+        // After all systems are informed of an event, inform the App.
+        // Note that acessing arbitrary events from the app is possibly
+        // buggy behavior, so we may wish to restrict this further.
         event::inform_application(app, ctx, evt);
     }
 }
