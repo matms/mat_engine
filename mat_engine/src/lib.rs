@@ -149,7 +149,7 @@ pub fn run<T: application::Application + 'static>() -> ! {
                         }
                     };
                 }
-                winit::event::Event::DeviceEvent { device_id, event } => {
+                winit::event::Event::DeviceEvent { event, .. } => {
                     ctx.input_system
                         .as_mut()
                         .unwrap()

@@ -41,6 +41,7 @@ pub trait EventReceiver {
     fn receive_event(ctx: &mut crate::EngineContext, evt: Event);
 }
 
+#[allow(unused_variables)]
 pub trait ApplicationEventReceiver {
     fn receives_event_type(evt_type: types::EventType) -> bool {
         false
@@ -57,6 +58,7 @@ pub(super) fn inform_receiver<T: EventReceiver>(ctx: &mut crate::EngineContext, 
     }
 }
 
+// TODO
 pub(super) fn inform_application<T: super::application::Application>(
     app: &mut T,
     ctx: &mut crate::EngineContext,
@@ -92,14 +94,15 @@ impl EventQueue {
     }
 }
 
+#[allow(dead_code)]
 /// Dummy event receiver for debugging purposes
 pub(super) struct DebugEventReceiver {}
 
 impl EventReceiver for DebugEventReceiver {
-    fn receives_event_type(evt_type: types::EventType) -> bool {
+    fn receives_event_type(_evt_type: types::EventType) -> bool {
         true
     }
-    fn receive_event(ctx: &mut crate::EngineContext, evt: Event) {
+    fn receive_event(_ctx: &mut crate::EngineContext, evt: Event) {
         log::trace!("Event: {:?}", evt);
     }
 }

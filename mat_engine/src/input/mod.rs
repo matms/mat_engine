@@ -241,11 +241,11 @@ impl InputSystem {
         }
     }
 
-    pub(crate) fn receive_winit_device_event(&mut self, evt: &winit::event::DeviceEvent) {
-        log::trace!(
-            "Input system received device event but didn't process it: {:?}",
-            evt
-        );
+    pub(crate) fn receive_winit_device_event(&mut self, _evt: &winit::event::DeviceEvent) {
+        //log::trace!(
+        //    "Input system received device event but didn't process it: {:?}",
+        //    evt
+        //);
     }
 }
 
