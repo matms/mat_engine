@@ -1,7 +1,7 @@
 [package]
 name = "sample_sandbox"
 version = "0.1.0"
-authors = ["BuildTools <unconfigured@null.null>"]
+authors = ["matms <matm31415@gmail.com>"]
 edition = "2018"
 
 # Prevent publishing by mistake
