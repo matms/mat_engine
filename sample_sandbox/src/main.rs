@@ -81,8 +81,8 @@ impl mat_engine::application::Application for MyApp {
     }
 
     fn render(&mut self, ctx: &mut mat_engine::context::EngineContext) {
-        //log::warn!("RENDER START");
-        let mut frt = mat_engine::rendering::start_render(ctx);
+        // log::warn!("RENDER START");
+        let mut frt = mat_engine::rendering::start_render(ctx).unwrap();
 
         self.rend_2d
             .render_sample_texture(ctx, &mut frt, self.tex_key);

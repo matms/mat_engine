@@ -17,6 +17,7 @@ use crate::utils::unwrap_mut;
 use camera_2d::Camera2d;
 use instance::{Instance, InstanceData};
 use vertex_2d::Vertex2d;
+use wgpu::util::DeviceExt;
 
 /// Default 2D renderer component.
 ///
@@ -38,21 +39,23 @@ impl Renderer2d {
         let texture_bind_group_layout = wgpu_state.device.create_bind_group_layout(&tex_desc);
 
         let camera = Camera2d::new(
-            wgpu_state.window_inner_width,
-            wgpu_state.window_inner_height,
+            wgpu_state.window_inner_size.width,
+            wgpu_state.window_inner_size.height,
             wgpu_state,
         );
 
-        let pipeline_key = wgpu_state.add_new_render_pipeline(
-            rend_2d_vert_shader(),
-            rend_2d_frag_shader(),
-            &[&texture_bind_group_layout, &camera.camera_bind_group_layout],
-            // TODO: Implement another builder for this to allow passing parameters
-            vec![
-                Vertex2d::buffer_descriptor(0..2), // 0 and 1 -> color and tex coords
-                InstanceData::buffer_descriptor(2..6), // 2 through 5 inclusive -> single mat4
-            ],
-        );
+        let pipeline_key = wgpu_state
+            .add_new_render_pipeline(
+                rend_2d_vert_shader(),
+                rend_2d_frag_shader(),
+                &[&texture_bind_group_layout, &camera.camera_bind_group_layout],
+                // TODO: Implement another builder for this to allow passing parameters
+                vec![
+                    Vertex2d::buffer_descriptor(0..2), // 0 and 1 -> color and tex coords
+                    InstanceData::buffer_descriptor(2..6), // 2 through 5 inclusive -> single mat4
+                ],
+            )
+            .unwrap();
 
         Self {
             texture_bind_group_layout,
@@ -65,8 +68,8 @@ impl Renderer2d {
         let wgpu_state = &mut unwrap_mut(&mut ctx.rendering_system).state;
 
         self.camera.feed_screen_size(
-            wgpu_state.window_inner_width,
-            wgpu_state.window_inner_height,
+            wgpu_state.window_inner_size.width,
+            wgpu_state.window_inner_size.height,
         );
 
         self.camera.update(wgpu_state);
@@ -129,20 +132,34 @@ impl Renderer2d {
 
         // BUFFERS
 
-        let vertex_buffer = wgpu_state
-            .device
-            .create_buffer_with_data(bytemuck::cast_slice(vertices), wgpu::BufferUsage::VERTEX);
+        let vertex_buffer =
+            wgpu_state
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("vertex buffer"),
+                    contents: bytemuck::cast_slice(vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
-        let index_buffer = wgpu_state
-            .device
-            .create_buffer_with_data(bytemuck::cast_slice(indices), wgpu::BufferUsage::INDEX);
+        let index_buffer =
+            wgpu_state
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("index buffer"),
+                    contents: bytemuck::cast_slice(indices),
+                    usage: wgpu::BufferUsages::INDEX,
+                });
 
         let instance_data: Vec<InstanceData> = instances.iter().map(Instance::to_data).collect();
 
-        let instance_buffer = wgpu_state.device.create_buffer_with_data(
-            bytemuck::cast_slice(&instance_data),
-            wgpu::BufferUsage::VERTEX,
-        );
+        let instance_buffer =
+            wgpu_state
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("instance buffer"),
+                    contents: bytemuck::cast_slice(&instance_data),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
 
         // We use a scope here bc we need to borrow frt mutably.
         {
@@ -162,15 +179,15 @@ impl Renderer2d {
 
             render_pass
                 .wgpu_render_pass
-                .set_vertex_buffer(0, &vertex_buffer, 0, 0);
+                .set_vertex_buffer(0, vertex_buffer.slice(..));
 
             render_pass
                 .wgpu_render_pass
-                .set_vertex_buffer(1, &instance_buffer, 0, 0);
+                .set_vertex_buffer(1, instance_buffer.slice(..));
 
             render_pass
                 .wgpu_render_pass
-                .set_index_buffer(&index_buffer, 0, 0);
+                .set_index_buffer(index_buffer.slice(..), wgpu::IndexFormat::Uint16);
 
             render_pass.wgpu_render_pass.draw_indexed(
                 0..(indices.len() as u32),

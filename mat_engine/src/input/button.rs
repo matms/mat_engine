@@ -58,7 +58,7 @@ pub enum MouseButtonId {
     Left,
     Right,
     Middle,
-    Other { winit_id: u8 },
+    Other { winit_id: u16 },
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]

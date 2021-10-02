@@ -1,9 +1,13 @@
 //! This file will be deleted later...
 
-use crate::rendering::{bind_group::BindGroupable, generic_uniform::Uniform};
-use zeroable::Zeroable;
+use std::num::NonZeroU64;
 
-#[derive(Copy, Clone, Debug, Zeroable)]
+use crate::rendering::{bind_group::BindGroupable, generic_uniform::Uniform};
+use bytemuck::{Pod, Zeroable};
+use wgpu::util::DeviceExt;
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Zeroable, Pod)]
 pub(super) struct TestUniformContent {
     pub(super) num: f32,
 }
@@ -17,7 +21,7 @@ static_assertions::const_assert_eq!(
 // Safety:
 // See https://docs.rs/bytemuck/1.2.0/bytemuck/trait.Pod.html
 // We need to check for the absence of padding, see static assert above.
-unsafe impl bytemuck::Pod for TestUniformContent {}
+// unsafe impl bytemuck::Pod for TestUniformContent {}
 
 pub(super) struct TestUniform {
     pub(super) content: TestUniformContent,
@@ -31,7 +35,7 @@ impl TestUniform {
         let buffer = Self::create_new_buffer(
             content,
             device,
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
         Self { content, buffer }
     }
@@ -40,12 +44,15 @@ impl TestUniform {
 impl BindGroupable for TestUniform {
     fn get_wgpu_bind_group_layout_descriptor() -> wgpu::BindGroupLayoutDescriptor<'static> {
         wgpu::BindGroupLayoutDescriptor {
-            bindings: &[wgpu::BindGroupLayoutEntry {
+            entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStage::VERTEX,
-                ty: wgpu::BindingType::UniformBuffer {
-                    dynamic: false, // This is NOT a dynamically sized array, it is statically sized.
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false, // This is NOT a dynamically sized array, it is statically sized.
+                    min_binding_size: None,
                 },
+                count: None,
             }],
             label: Some("test_uniform_bind_group_layout"),
         }
@@ -57,12 +64,13 @@ impl BindGroupable for TestUniform {
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
-            bindings: &[wgpu::Binding {
+            entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer {
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &self.buffer,
-                    range: 0..std::mem::size_of_val(&self.content) as wgpu::BufferAddress,
-                },
+                    offset: 0,
+                    size: NonZeroU64::new(std::mem::size_of_val(&self.content) as u64),
+                }),
             }],
             label: Some("test_uniform_bind_group"),
         })
@@ -75,14 +83,18 @@ impl Uniform for TestUniform {
     fn create_new_buffer(
         content: Self::Content,
         device: &mut wgpu::Device,
-        usage: wgpu::BufferUsage,
+        usage: wgpu::BufferUsages,
     ) -> wgpu::Buffer {
-        device.create_buffer_with_data(bytemuck::cast_slice(&[content]), usage)
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            contents: bytemuck::cast_slice(&[content]),
+            usage: usage,
+            label: None,
+        })
     }
 
     fn update_buffer(&self, encoder: &mut wgpu::CommandEncoder, device: &mut wgpu::Device) {
         let staging_buffer =
-            Self::create_new_buffer(self.content, device, wgpu::BufferUsage::COPY_SRC);
+            Self::create_new_buffer(self.content, device, wgpu::BufferUsages::COPY_SRC);
 
         encoder.copy_buffer_to_buffer(
             &staging_buffer,

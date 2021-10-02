@@ -73,12 +73,15 @@ impl EngineContext {
 
     /// Automatically called, therefore isn't exported to users of crate.
     pub(crate) fn rendering_init(&mut self) {
-        self.rendering_system = Some(crate::rendering::RenderingSystem::new(
-            &self
-                .windowing_system
-                .as_mut()
-                .expect("Need windowing system to make rendering system"),
-        ));
+        self.rendering_system = Some(
+            crate::rendering::RenderingSystem::new(
+                &self
+                    .windowing_system
+                    .as_mut()
+                    .expect("Need windowing system to make rendering system"),
+            )
+            .unwrap(),
+        );
     }
 
     /// Initialize the Imgui System.

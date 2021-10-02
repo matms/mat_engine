@@ -55,7 +55,7 @@ impl VertexBufferable for InstanceData {
 
         VertexBufferSetting {
             stride: std::mem::size_of::<InstanceData>() as u64,
-            step_mode: wgpu::InputStepMode::Instance,
+            step_mode: wgpu::VertexStepMode::Instance,
             attributes: vec![
                 // Total of 16 floats ( 4 x 4 ) -> corresponds to one Mat4
                 // We need to do this this because the largest floating point vertex attribute possible is
@@ -63,24 +63,24 @@ impl VertexBufferable for InstanceData {
                 //
                 // In the shader, you can just write mat4 and indicate start_shader_location for location,
                 // and it just works.
-                wgpu::VertexAttributeDescriptor {
+                wgpu::VertexAttribute {
                     offset: 0,
-                    format: wgpu::VertexFormat::Float4,
+                    format: wgpu::VertexFormat::Float32x4,
                     shader_location: start_shader_location,
                 },
-                wgpu::VertexAttributeDescriptor {
+                wgpu::VertexAttribute {
                     offset: (std::mem::size_of::<f32>() * 4) as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Float4,
+                    format: wgpu::VertexFormat::Float32x4,
                     shader_location: start_shader_location + 1,
                 },
-                wgpu::VertexAttributeDescriptor {
+                wgpu::VertexAttribute {
                     offset: (std::mem::size_of::<f32>() * 8) as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Float4,
+                    format: wgpu::VertexFormat::Float32x4,
                     shader_location: start_shader_location + 2,
                 },
-                wgpu::VertexAttributeDescriptor {
+                wgpu::VertexAttribute {
                     offset: (std::mem::size_of::<f32>() * 12) as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Float4,
+                    format: wgpu::VertexFormat::Float32x4,
                     shader_location: start_shader_location + 3,
                 },
             ],

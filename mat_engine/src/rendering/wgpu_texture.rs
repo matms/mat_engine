@@ -1,5 +1,8 @@
+use std::num::NonZeroU32;
+
 use crate::typedefs::BoxErr;
 use image::GenericImageView;
+use wgpu::util::DeviceExt;
 
 // See https://sotrh.github.io/learn-wgpu/beginner/tutorial5-textures/
 
@@ -38,24 +41,27 @@ impl WgpuTexture {
         let size = wgpu::Extent3d {
             width,
             height,
-            depth: 1, // Depth of 1 represents 2D texture
+            depth_or_array_layers: 1, // Depth of 1 represents 2D texture
         };
 
         // Make empty texture
         let texture = wgpu_device.create_texture(&wgpu::TextureDescriptor {
             label,
             size,
-            array_layer_count: 1,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+            format: wgpu::TextureFormat::Rgba8Unorm, // TODO: Rgba8Unorm or Rgba8UnormSrgb
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         });
 
         // Note: If the image is very big you will get a warning, but it shouldn't be an issue
         // bc it will allocate anyways, I think.
-        let buffer = wgpu_device.create_buffer_with_data(&rgba_data, wgpu::BufferUsage::COPY_SRC);
+        let buffer = wgpu_device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            usage: wgpu::BufferUsages::COPY_SRC,
+            contents: &rgba_data,
+        });
 
         let mut encoder = wgpu_device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some(
@@ -69,24 +75,26 @@ impl WgpuTexture {
 
         // Copy rgba data from buffer to texture
         encoder.copy_buffer_to_texture(
-            wgpu::BufferCopyView {
+            wgpu::ImageCopyBuffer {
                 buffer: &buffer,
-                offset: 0,
-                bytes_per_row: 4 * width,
-                rows_per_image: height,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: NonZeroU32::new(4 * width),
+                    rows_per_image: NonZeroU32::new(height),
+                },
             },
-            wgpu::TextureCopyView {
+            wgpu::ImageCopyTexture {
                 texture: &texture,
                 mip_level: 0,
-                array_layer: 0,
                 origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
             },
             size,
         );
 
         let cmd_buffer = encoder.finish();
 
-        let texture_view = texture.create_default_view();
+        let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let sampler = wgpu_device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -97,7 +105,7 @@ impl WgpuTexture {
             mipmap_filter: wgpu::FilterMode::Nearest,
             lod_min_clamp: -100.0,
             lod_max_clamp: 100.0,
-            compare: wgpu::CompareFunction::Always,
+            ..Default::default()
         });
 
         Ok((
@@ -117,21 +125,26 @@ impl crate::rendering::bind_group::BindGroupable for WgpuTexture {
             // See `BindGroupDescriptor` instantiation for important info on the bindings.
             // If you change sth. here, you'll probably have to change it there also, so
             // be careful.
-            bindings: &[
+            entries: &[
                 // Copied from https://sotrh.github.io/learn-wgpu/beginner/tutorial5-textures/#the-bindgroup
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::SampledTexture {
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
                         multisampled: false,
-                        dimension: wgpu::TextureViewDimension::D2,
-                        component_type: wgpu::TextureComponentType::Uint,
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
                     },
+                    count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
                     binding: 1,
-                    visibility: wgpu::ShaderStage::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler { comparison: false },
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler {
+                        comparison: false,
+                        filtering: true,
+                    },
+                    count: None,
                 },
                 // End copied from
             ],
@@ -149,12 +162,12 @@ impl crate::rendering::bind_group::BindGroupable for WgpuTexture {
             // See `BindGroupLayoutDescriptor` instantiation for important info info on the bindings.
             // If you change sth. here, you'll probably have to change it there also, so
             // be careful.
-            bindings: &[
-                wgpu::Binding {
+            entries: &[
+                wgpu::BindGroupEntry {
                     binding: 0,
                     resource: wgpu::BindingResource::TextureView(&self.texture_view),
                 },
-                wgpu::Binding {
+                wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&self.sampler),
                 },

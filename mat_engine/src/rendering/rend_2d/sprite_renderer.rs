@@ -1,3 +1,5 @@
+use wgpu::util::DeviceExt;
+
 use super::instance::Instance;
 use crate::{
     arena::{Arena, ArenaKey},
@@ -24,14 +26,20 @@ impl CachedSprite {
     fn new_from_sprite(wgpu_state: &mut WgpuState, sprite: Sprite) -> Self {
         Self {
             sprite,
-            vertex_buffer: wgpu_state.device.create_buffer_with_data(
-                bytemuck::cast_slice(&sprite.vertices),
-                wgpu::BufferUsage::VERTEX,
+            vertex_buffer: wgpu_state.device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("vertex buffer"),
+                    contents: bytemuck::cast_slice(&sprite.vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                },
             ),
-            index_buffer: wgpu_state.device.create_buffer_with_data(
-                bytemuck::cast_slice(&sprite.indices),
-                wgpu::BufferUsage::INDEX,
-            ),
+            index_buffer: wgpu_state
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("index buffer"),
+                    contents: bytemuck::cast_slice(&sprite.indices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                }),
         }
     }
 }

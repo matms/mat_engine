@@ -1,3 +1,7 @@
+use anyhow::anyhow;
+use anyhow::Result as AResult;
+use winit::dpi::PhysicalSize;
+
 use super::{
     bind_group::BindGroupable,
     frame::FrameRenderTarget,
@@ -17,11 +21,9 @@ pub(crate) struct WgpuState {
     pub(super) adapter: wgpu::Adapter,
     pub(super) device: wgpu::Device,
     pub(super) queue: wgpu::Queue,
-    pub(super) swap_chain_descriptor: wgpu::SwapChainDescriptor,
-    pub(super) swap_chain: wgpu::SwapChain,
 
-    pub(super) window_inner_width: u32,
-    pub(super) window_inner_height: u32,
+    pub(super) window_inner_size: PhysicalSize<u32>,
+    pub(super) surface_cfg: wgpu::SurfaceConfiguration,
 
     // --- ARENAS ---
     // TODO: Maybe move (at least some of) these somewhere else...
@@ -36,115 +38,119 @@ impl WgpuState {
         // TODO: Abstract -> Remove direct dependency on winit window (see wgpu trait bounds
         // on window)
         window: &winit::window::Window,
-        window_inner_width: u32,
-        window_inner_height: u32,
-    ) -> Self {
-        let surface = wgpu::Surface::create(window);
+    ) -> AResult<Self> {
+        let window_inner_size = window.inner_size();
+
+        let instance = wgpu::Instance::new(wgpu::Backends::all());
+
+        // Safety: window must outlive surface.
+        // TODO: Enforce this!
+        let surface = unsafe { instance.create_surface(window) };
 
         let request_adapter_options = &wgpu::RequestAdapterOptions {
             compatible_surface: Some(&surface),
-            power_preference: wgpu::PowerPreference::Default,
+            power_preference: wgpu::PowerPreference::default(),
         };
 
         let adapter: wgpu::Adapter = futures::executor::block_on(async {
-            wgpu::Adapter::request(
-                request_adapter_options,
-                // See wgpu docs. As of writing: Vulkan, Metal and DX12 are PRIMARY.
-                wgpu::BackendBit::PRIMARY,
-            )
-            .await
-            .unwrap()
-        });
+            instance.request_adapter(request_adapter_options).await
+        })
+        .ok_or(anyhow!("adapter could not be obtained"))?;
 
         let request_device_descriptor = &wgpu::DeviceDescriptor {
-            extensions: wgpu::Extensions {
-                anisotropic_filtering: false,
-            },
+            features: wgpu::Features::SPIRV_SHADER_PASSTHROUGH,
             limits: Default::default(),
+            label: Some("Default Device"),
         };
 
         let (device, queue): (wgpu::Device, wgpu::Queue) = futures::executor::block_on(async {
-            adapter.request_device(request_device_descriptor).await
-        });
+            adapter
+                .request_device(request_device_descriptor, None)
+                .await
+        })?;
 
-        let swap_chain_descriptor = wgpu::SwapChainDescriptor {
-            // Texture will be used to output to screen
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            // Bgra8UnormSrgb should be supported by all APIs.
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
-            width: window_inner_width,
-            height: window_inner_height,
-            // See https://docs.rs/wgpu/0.5.0/wgpu/enum.PresentMode.html
-            // Note: It seems that Immediate is not working on my PC, as it is
-            // falling back to Fifo, as the docs describe.
-            // Mailbox seems to induce some frames having longer frametimes than other,
-            // I should investigate.
-            // Fifo just means wait for Vsync.
-            present_mode: wgpu::PresentMode::Fifo,
+        let surface_cfg = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface
+                .get_preferred_format(&adapter)
+                .ok_or(anyhow!("Preferred format error"))?,
+            width: window_inner_size.width,
+            height: window_inner_size.height,
+            present_mode: wgpu::PresentMode::Fifo, // DOes FIFO work now?
         };
 
-        let swap_chain = device.create_swap_chain(&surface, &swap_chain_descriptor);
+        log::trace!("Preferred format {:#?}", surface_cfg.format);
+
+        surface.configure(&device, &surface_cfg);
 
         let render_pipelines = Arena::new();
         let textures = Arena::new();
         let bind_groups = Arena::new();
 
-        Self {
+        Ok(Self {
             surface,
             adapter,
             device,
             queue,
-            swap_chain_descriptor,
-            swap_chain,
-            window_inner_width,
-            window_inner_height,
+            window_inner_size,
             render_pipelines,
             textures,
             bind_groups,
-        }
+            surface_cfg,
+        })
     }
 
-    pub(super) fn resize(&mut self, new_inner_width: u32, new_inner_height: u32) {
+    pub(super) fn resize(&mut self, new_inner_size: PhysicalSize<u32>) {
         log::trace!("Resizing (WgpuState)");
-        self.window_inner_width = new_inner_width;
-        self.window_inner_height = new_inner_height;
-        self.swap_chain_descriptor.width = new_inner_width;
-        self.swap_chain_descriptor.height = new_inner_height;
-        self.swap_chain = self
-            .device
-            .create_swap_chain(&self.surface, &self.swap_chain_descriptor);
+        assert!(new_inner_size.width > 0 && new_inner_size.height > 0);
+
+        self.window_inner_size = new_inner_size;
+        self.surface_cfg.width = new_inner_size.width;
+        self.surface_cfg.height = new_inner_size.height;
+
+        self.surface.configure(&self.device, &self.surface_cfg);
     }
 
     /// Returns a `FrameRenderTarget`, which will be used for rendering and must be
     /// given back to complete_frame_render().
-    pub(super) fn start_frame_render(&mut self) -> FrameRenderTarget {
-        let frame = self.swap_chain.get_next_texture().unwrap();
-
+    pub(super) fn start_frame_render(&mut self) -> anyhow::Result<FrameRenderTarget> {
+        let frame = self.surface.get_current_frame()?;
+        let view = frame
+            .output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
         let encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("wgpu renderer encoder"),
             });
 
-        FrameRenderTarget { frame, encoder }
+        let mut frt = FrameRenderTarget {
+            frame,
+            view,
+            encoder,
+        };
+
+        // By default, clear the screen at the start of a frame.
+        self.make_clear_render_pass(&mut frt);
+
+        Ok(frt)
     }
 
-    pub(super) fn complete_frame_render(&mut self, frt: FrameRenderTarget) {
-        self.queue.submit(&[frt.encoder.finish()])
-    }
-
-    pub(super) fn make_render_pass<'a>(&'a self, frt: &'a mut FrameRenderTarget) -> RenderPass<'a> {
+    fn make_clear_render_pass<'a>(&'a self, frt: &'a mut FrameRenderTarget) -> RenderPass<'a> {
         let render_pass_descriptor = &wgpu::RenderPassDescriptor {
-            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: &frt.frame.view,
+            label: Some("wgpu render pass"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: &frt.view,
                 resolve_target: None,
-                load_op: wgpu::LoadOp::Clear,
-                store_op: wgpu::StoreOp::Store,
-                clear_color: wgpu::Color {
-                    r: 0.1,
-                    g: 0.2,
-                    b: 0.3,
-                    a: 1.0,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: 0.3,
+                        a: 1.0,
+                    }),
+                    store: true,
                 },
             }],
             depth_stencil_attachment: None,
@@ -156,35 +162,78 @@ impl WgpuState {
         }
     }
 
+    pub(super) fn make_render_pass<'a>(&'a self, frt: &'a mut FrameRenderTarget) -> RenderPass<'a> {
+        let render_pass_descriptor = &wgpu::RenderPassDescriptor {
+            label: Some("wgpu render pass"),
+            color_attachments: &[wgpu::RenderPassColorAttachment {
+                view: &frt.view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            }],
+            depth_stencil_attachment: None,
+        };
+        let render_pass = frt.encoder.begin_render_pass(render_pass_descriptor);
+
+        RenderPass {
+            wgpu_render_pass: render_pass,
+        }
+    }
+
+    pub(super) fn complete_frame_render(&mut self, frt: FrameRenderTarget) {
+        self.queue.submit(std::iter::once(frt.encoder.finish()))
+    }
+
     pub(super) fn add_new_render_pipeline(
         &mut self,
         vert_shader: &crate::rendering::shaders::Shader,
         frag_shader: &crate::rendering::shaders::Shader,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
         vertex_buffers: Vec<VertexBufferSetting>,
-    ) -> ArenaKey {
+    ) -> AResult<ArenaKey> {
+        let vert_shader_desc = wgpu::ShaderModuleDescriptorSpirV {
+            label: Some("Vert Shader"),
+            source: vert_shader.as_ref().into(),
+        };
+
+        let frag_shader_desc = wgpu::ShaderModuleDescriptorSpirV {
+            label: Some("Frag Shader"),
+            source: frag_shader.as_ref().into(),
+        };
+
+        /*
         let vert_shader_data =
             wgpu::read_spirv(std::io::Cursor::new(vert_shader.as_ref())).unwrap();
 
         let frag_shader_data =
             wgpu::read_spirv(std::io::Cursor::new(frag_shader.as_ref())).unwrap();
+        */
 
-        let vert_shader_module = self.device.create_shader_module(&vert_shader_data);
-        let frag_shader_module = self.device.create_shader_module(&frag_shader_data);
+        // Safety: Bad spirV data may cause UB.
+        let vert_shader_module =
+            unsafe { self.device.create_shader_module_spirv(&vert_shader_desc) };
+        let frag_shader_module =
+            unsafe { self.device.create_shader_module_spirv(&frag_shader_desc) };
 
-        let render_pipeline_layout = self
-            .device
-            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { bind_group_layouts });
+        let render_pipeline_layout =
+            self.device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("wgpu render pipeline layout"),
+                    push_constant_ranges: &[],
+                    bind_group_layouts,
+                });
 
         let render_pipeline = PipelineBuilder::new()
             .set_vertex_shader(&vert_shader_module)
             .set_fragment_shader(&frag_shader_module)
             .set_pipeline_layout(&render_pipeline_layout)
-            .set_swap_chain_descriptor_format(self.swap_chain_descriptor.format)
+            .set_texture_format(self.surface_cfg.format)
             .set_vertex_buffers(vertex_buffers)
             .build(&mut self.device);
 
-        self.render_pipelines.insert(render_pipeline)
+        Ok(self.render_pipelines.insert(render_pipeline?))
     }
 
     /// See `WgpuTexture` for info on the format of the bytes.
@@ -196,7 +245,7 @@ impl WgpuState {
         let (texture, cmd_buf) =
             WgpuTexture::new_from_bytes(&mut self.device, texture_bytes, label).unwrap();
 
-        self.queue.submit(&[cmd_buf]);
+        self.queue.submit(std::iter::once(cmd_buf));
 
         self.textures.insert(texture)
     }
@@ -254,7 +303,7 @@ impl WgpuState {
 
         uniform.update_buffer(&mut enc, &mut self.device);
 
-        self.queue.submit(&[enc.finish()]);
+        self.queue.submit(std::iter::once(enc.finish()));
     }
 }
 

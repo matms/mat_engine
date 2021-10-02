@@ -118,8 +118,7 @@ pub fn run<T: application::Application + 'static>() -> ! {
                             // stay in the queue until that happens.
                             ctx.event_queue.push_event(event::Event::WindowResizeEvent(
                                 event::events::WindowResizeEvent {
-                                    new_inner_width: new_size.width,
-                                    new_inner_height: new_size.height,
+                                    new_size: *new_size
                                 },
                             ));
                         }
@@ -130,8 +129,7 @@ pub fn run<T: application::Application + 'static>() -> ! {
                             // stay in the queue until that happens.
                             ctx.event_queue.push_event(event::Event::WindowResizeEvent(
                                 event::events::WindowResizeEvent {
-                                    new_inner_width: new_inner_size.width,
-                                    new_inner_height: new_inner_size.height,
+                                    new_size: **new_inner_size
                                 },
                             ));
                         }

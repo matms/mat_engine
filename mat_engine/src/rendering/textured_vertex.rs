@@ -1,10 +1,11 @@
 use super::{vertex_buffer::VertexBufferable, wgpu_pipeline::VertexBufferSetting};
 use crate::rendering::vertex_trait::Vertex;
+
+use bytemuck::{Pod, Zeroable};
 use std::ops::Range;
-use zeroable::Zeroable;
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug, Zeroable)]
+#[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub(crate) struct TexturedVertex {
     pub(crate) position: [f32; 3],
     pub(crate) tex_coords: [f32; 2],
@@ -19,7 +20,7 @@ static_assertions::const_assert_eq!(
 // Safety:
 // See https://docs.rs/bytemuck/1.2.0/bytemuck/trait.Pod.html
 // We need to check for the absence of padding, see static assert above.
-unsafe impl bytemuck::Pod for TexturedVertex {}
+//unsafe impl bytemuck::Pod for TexturedVertex {}
 
 impl VertexBufferable for TexturedVertex {
     fn buffer_descriptor(shader_locations: Range<u32>) -> VertexBufferSetting {
@@ -29,18 +30,18 @@ impl VertexBufferable for TexturedVertex {
 
         VertexBufferSetting {
             stride: std::mem::size_of::<TexturedVertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::InputStepMode::Vertex,
+            step_mode: wgpu::VertexStepMode::Vertex,
             attributes: vec![
-                wgpu::VertexAttributeDescriptor {
+                wgpu::VertexAttribute {
                     // Position
                     offset: 0,
-                    format: wgpu::VertexFormat::Float3,
+                    format: wgpu::VertexFormat::Float32x3,
                     shader_location: start_shader_location,
                 },
-                wgpu::VertexAttributeDescriptor {
+                wgpu::VertexAttribute {
                     // Tex Coords
                     offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    format: wgpu::VertexFormat::Float2,
+                    format: wgpu::VertexFormat::Float32x3,
                     shader_location: start_shader_location + 1,
                 },
             ],

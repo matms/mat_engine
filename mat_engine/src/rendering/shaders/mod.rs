@@ -28,7 +28,7 @@ pub(crate) unsafe fn compile_glsl_to_spirv<S: AsRef<str>>(
 
     Shader {
         shader_type,
-        binary: binary_result.as_binary_u8().to_vec(),
+        binary: binary_result.as_binary().to_vec(),
     }
 }
 
@@ -114,7 +114,7 @@ impl ShaderType {
 
 pub struct Shader {
     shader_type: ShaderType,
-    binary: Vec<u8>,
+    binary: Vec<u32>,
 }
 
 impl Shader {
@@ -123,7 +123,7 @@ impl Shader {
         self.shader_type
     }
 
-    pub(crate) fn as_ref(&self) -> &[u8] {
+    pub(crate) fn as_ref(&self) -> &[u32] {
         self.binary.as_ref()
     }
 }

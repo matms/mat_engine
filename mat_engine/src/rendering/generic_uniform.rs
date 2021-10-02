@@ -19,7 +19,7 @@ pub(super) trait Uniform: BindGroupable {
     fn create_new_buffer(
         content: Self::Content,
         device: &mut wgpu::Device,
-        usage: wgpu::BufferUsage,
+        usage: wgpu::BufferUsages,
     ) -> wgpu::Buffer;
 
     /// Uses the encoder passed in to update the buffer stored in the uniform object.

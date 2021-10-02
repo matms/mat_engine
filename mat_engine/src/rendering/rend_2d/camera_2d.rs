@@ -1,9 +1,12 @@
+use std::num::NonZeroU64;
+
 use crate::{
     arena::ArenaKey,
     rendering::{bind_group::BindGroupable, generic_uniform::Uniform, wgpu_state::WgpuState},
 };
 
 use nalgebra_glm as glm;
+use wgpu::util::DeviceExt;
 
 pub struct Camera2d {
     camera_uniform_component: CameraUniformComponent,
@@ -225,7 +228,7 @@ impl CameraUniformComponent {
         let buffer = Self::create_new_buffer(
             content,
             device,
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
         Self { content, buffer }
     }
@@ -257,12 +260,15 @@ unsafe impl bytemuck::Pod for CameraUniformContent {}
 impl BindGroupable for CameraUniformComponent {
     fn get_wgpu_bind_group_layout_descriptor() -> wgpu::BindGroupLayoutDescriptor<'static> {
         wgpu::BindGroupLayoutDescriptor {
-            bindings: &[wgpu::BindGroupLayoutEntry {
+            entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
-                visibility: wgpu::ShaderStage::VERTEX,
-                ty: wgpu::BindingType::UniformBuffer {
-                    dynamic: false, // This is NOT a dynamically sized array, it is statically sized.
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Uniform,
+                    has_dynamic_offset: false, // This is NOT a dynamically sized array, it is statically sized.
+                    min_binding_size: None,
                 },
+                count: None,
             }],
             label: Some("camera_bind_group_layout"),
         }
@@ -274,12 +280,13 @@ impl BindGroupable for CameraUniformComponent {
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
-            bindings: &[wgpu::Binding {
+            entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer {
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: &self.buffer,
-                    range: 0..std::mem::size_of_val(&self.content) as wgpu::BufferAddress,
-                },
+                    offset: 0,
+                    size: NonZeroU64::new(std::mem::size_of_val(&self.content) as u64),
+                }),
             }],
             label: Some("camera_bind_group"),
         })
@@ -292,13 +299,17 @@ impl Uniform for CameraUniformComponent {
     fn create_new_buffer(
         content: Self::Content,
         device: &mut wgpu::Device,
-        usage: wgpu::BufferUsage,
+        usage: wgpu::BufferUsages,
     ) -> wgpu::Buffer {
-        device.create_buffer_with_data(bytemuck::cast_slice(&[content]), usage)
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&[content]),
+            usage,
+        })
     }
     fn update_buffer(&self, encoder: &mut wgpu::CommandEncoder, device: &mut wgpu::Device) {
         let staging_buffer =
-            Self::create_new_buffer(self.content, device, wgpu::BufferUsage::COPY_SRC);
+            Self::create_new_buffer(self.content, device, wgpu::BufferUsages::COPY_SRC);
 
         encoder.copy_buffer_to_buffer(
             &staging_buffer,
