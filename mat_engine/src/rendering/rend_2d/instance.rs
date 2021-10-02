@@ -5,7 +5,7 @@ use std::ops::Range;
 
 /// Instance object for `Renderer2d`. Allows translating and scaling sprites, but currently doesn't
 /// allow for rotating them.
-pub(super) struct Instance {
+pub struct Instance {
     pub position: glm::Vec2,
     pub scale: f32,
 }

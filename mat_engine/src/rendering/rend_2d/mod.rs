@@ -5,6 +5,8 @@ pub(crate) mod instance;
 pub(crate) mod test_uniform;
 pub(crate) mod vertex_2d;
 
+pub mod sprite_renderer;
+
 use super::{
     bind_group::BindGroupable, shaders, vertex_buffer::VertexBufferable, wgpu_state::WgpuState,
     wgpu_texture::WgpuTexture, FrameRenderTarget,
