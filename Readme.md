@@ -1,7 +1,6 @@
 # Readme
 
-This is a 2d rendering engine that I wrote to learn Rust & wgpu. It is very
-in _early_ development. No API stability guaranteed.
+This is a 2d rendering engine that I wrote to learn Rust & wgpu. It is in very _early_ development. No API stability guaranteed.
 
 I have recently updated it so it should build with wgpu 0.10.
 
